@@ -10,7 +10,8 @@ from Tool import screngrap
 from collections import deque
 import time
 import matplotlib.pyplot as plt
-
+for i in range (0,10):
+    print(np.random.randint(0, 6))
 state = screngrap.screngrap.grap('HOLLOW KNIGHT')
 state = torch.tensor(state).permute(2, 0, 1)
 state = torch.tensor(state, dtype=torch.float32) / 255.0

@@ -5,20 +5,24 @@ import numpy as np
 import random
 from dqnnet import Q_construct
 from dqnnet import QNetwork
-from DQN_HollowKnight.dqn_net import QNetworktest
+# from DQN_HollowKnight.dqn_net import QNetworktest
 from Tool import screngrap
 from collections import deque
 import time
 import matplotlib.pyplot as plt
+from replay_buff import ReplayMemory
 from Tool import framebuffer
-
-model = Q_construct(input_dim=int((1280/4)*(720/4)), num_actions=7,image_channels=4)
+from hollowknight_env import HollowKnightEnv
+model = Q_construct(input_dim=int((1280/4)*(720/4)), num_actions=6,image_channels=4)
 frame_buffer = framebuffer.FrameBuffer(windows_name="HOLLOW KNIGHT", buffer_size=4, capture_interval=0.05)
-
-epsilon = 0.1
+epsilon = 1
+epsilon_min = 0.1  # 最小探索機率
+epsilon_decay = 0.995  
 gridsize = 15
 GAMMA = 0.9
 optimizer = torch.optim.Adam(model.parameters(), lr = 1e-5)
+memory = ReplayMemory(1000)
+env = HollowKnightEnv()
 
 def run_episode(num_games):
     run = True
@@ -30,35 +34,37 @@ def run_episode(num_games):
     frame_buffer.start()
     while run:
         frames = frame_buffer.get_latest_frames()
-        if(len(frames)>=4):
-            action_0 = model(frames)
-            rand = np.random.uniform(0, 1)
         # state = screngrap.screngrap.grap('HOLLOW KNIGHT')
         # state = torch.tensor(state).permute(2, 0, 1)
         # state = torch.tensor(state, dtype=torch.float32) / 255.0
         # state = state.unsqueeze(0)
         # action_0 = model.forward(state)
         # rand = np.random.uniform(0, 1)
+        rand = np.random.uniform(0, 1)  # 隨機生成一個 0 到 1 之間的數字
+        action = 0
+        global epsilon 
         if rand > epsilon:
-            action = torch.argmax(action_0)
+            if(frames != None):
+                action_0 = model(frames)
+                action =  torch.argmax(action_0).item()
         else:
             action = np.random.randint(0, 6)
-        
-        ## update_boardstate the same snake till
-        reward, done, len_of_snake = board.update_boardstate(action)
-        next_state = get_network_input(board.snake, board.apple)
+        env.state = frames 
+        reward , done = env.step(action)
 
-        memory.push(state, action, reward, next_state, done)
+        frames = frame_buffer.get_latest_frames()
+        env.previous_state = env.state
+        env.state = frames
+        memory.push( env.previous_state, action, reward, env.state , done)
 
         total_reward += reward
 
         episode_games += 1
-
-        if board.game_over == True:
-            games_played += 1
-            len_array.append(len_of_snake)
-            board.resetgame()
-
+        epsilon = max(epsilon_min, epsilon * epsilon_decay)  # 確保 epsilon 不小於 epsilon_min
+        if done == True:
+            run = False 
+            # len_array.append(len_of_snake)
+            # board.resetgame()
             if num_games == games_played:
                 run = False
 
@@ -110,43 +116,39 @@ batch_size = 20
 
 
 def train():
-    scores_deque = deque(maxlen=100)
-    scores_array = []
-    avg_scores_array = []
+    scores_deque = deque(maxlen=100)  # 保存最近 100 個回合的分數
+    scores_array = []  # 保存每一回合的分數
+    avg_scores_array = []  # 保存平均分數
+    time_start = time.time()  # 記錄開始時間
 
-    avg_len_array = []
-    avg_max_len_array = []
+    for i_episode in range(1, num_episodes + 1):
+        # 初始化環境
+        env.reset()  # 假設 `HollowKnightEnv` 提供 reset 方法
+        score, _, _ = run_episode(games_in_episode)  # 運行一個回合
 
-    time_start = time.time()
+        scores_deque.append(score)  # 添加本次回合分數
+        scores_array.append(score)  # 保存分數
+        avg_score = np.mean(scores_deque)  # 計算最近100回合的平均分
+        avg_scores_array.append(avg_score)  # 保存平均分數
 
-    for i_episode in range(num_episodes + 1):
-
-        ## print('i_episode: ', i_episode)
-
-        score, avg_len, max_len = run_episode(games_in_episode)
-        scores_deque.append(score)
-        scores_array.append(score)
-        avg_len_array.append(avg_len)
-        avg_max_len_array.append(max_len)
-
-        avg_score = np.mean(scores_deque)
-        avg_scores_array.append(avg_score)
-
+        # 更新 Q 網絡
         total_loss = learn(num_updates, batch_size)
 
-        dt = (int)(time.time() - time_start)
-
-        if i_episode % print_every == 0 and i_episode > 0:
+        # 打印訓練進度
+        if i_episode % print_every == 0:
+            elapsed_time = int(time.time() - time_start)
             print(
-                'Ep.: {:6}, Loss: {:.3f}, Avg.Score: {:.2f}, Avg.LenOfSnake: {:.2f}, Max.LenOfSnake:  {:.2f} Time: {:02}:{:02}:{:02} '. \
-                format(i_episode, total_loss, score, avg_len, max_len, dt // 3600, dt % 3600 // 60, dt % 60))
+                f"Ep.: {i_episode:6}, Loss: {total_loss:.3f}, "
+                f"Avg.Score: {avg_score:.2f}, "
+                f"Time: {elapsed_time // 3600:02}:{elapsed_time % 3600 // 60:02}:{elapsed_time % 60:02}"
+            )
 
-        memory.truncate()
+        # 保存模型檔案
+        if i_episode % 1000 == 0:
+            torch.save(model.state_dict(), f'./dir_chk_len/HollowKnight_{i_episode}.pth')
 
-        if i_episode % 1000 == 0 and i_episode > 0:
-            torch.save(model.state_dict(), './dir_chk_len/Snake_{}'.format(i_episode))
-
-    return scores_array, avg_scores_array, avg_len_array, avg_max_len_array
+    # 返回訓練結果
+    return scores_array, avg_scores_array
 
 if __name__ == "__main__":
     scores, avg_scores, avg_len_of_snake, max_len_of_snake = train()
