@@ -13,9 +13,9 @@ import matplotlib.pyplot as plt
 from replay_buff import ReplayMemory
 from Tool import framebuffer
 from hollowknight_env import HollowKnightEnv
-model = Q_construct(input_dim=int((1280/4)*(720/4)), num_actions=6,image_channels=4)
+model =  Q_construct(input_dim=int((1280/4)*(720/4)), num_actions=6,image_channels=4)
 frame_buffer = framebuffer.FrameBuffer(windows_name="HOLLOW KNIGHT", buffer_size=4, capture_interval=0.05)
-epsilon = 1
+epsilon = 0
 epsilon_min = 0.1  # 最小探索機率
 epsilon_decay = 0.995  
 gridsize = 15
@@ -45,8 +45,9 @@ def run_episode(num_games):
         global epsilon 
         if rand > epsilon:
             if(frames != None):
-                action_0 = model(frames)
-                action =  torch.argmax(action_0).item()
+                if(len(frames)>=4):
+                    action_0 = model(frames)
+                    action =  action_0
         else:
             action = np.random.randint(0, 6)
         env.state = frames 

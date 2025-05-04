@@ -43,7 +43,7 @@ class QNetwork(nn.Module):
         x = F.relu(self.fc3(x))
         x = self.dropout(x)
         x = self.fc4(x)
-        return  torch.argmax(x, dim=1)
+        return  torch.argmax(x, dim=1)[-1].item()
 
 
 def Q_construct(input_dim, num_actions, image_channels=3):

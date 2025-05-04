@@ -16,7 +16,10 @@ class screngrap():
         h = bot - top
 
         # 設置前景窗口，等待穩定
-        win32gui.SetForegroundWindow(hwnd_target)
+        try:
+            win32gui.SetForegroundWindow(hwnd_target)
+        except:
+            print("error")
         time.sleep(1.0)
 
         # 截圖
