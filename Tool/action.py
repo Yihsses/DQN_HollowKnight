@@ -91,7 +91,17 @@ def Mid_Jump():
     sendkey.ReleaseKey(Space)
     Nothing()
 
-
+def restart():
+    sendkey.PressKey(Space)
+    sendkey.ReleaseKey(Space)
+    time.sleep(4)
+    sendkey.PressKey(W)
+    sendkey.ReleaseKey(W)
+    time.sleep(1)
+    sendkey.PressKey(Space)
+    sendkey.ReleaseKey(Space)
+    time.sleep(3)
+    print("成功進入")
 # Skill
 # 4
 # def Skill():

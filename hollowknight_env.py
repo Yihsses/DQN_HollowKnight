@@ -1,5 +1,6 @@
 import numpy as np
 import time
+from Tool.action import restart
 from Tool.action import  take_action
 from Tool.action import TackAction
 from Tool.screngrap import screngrap
@@ -18,6 +19,7 @@ class HollowKnightEnv:
         """
         重置環境到初始狀態
         """
+        restart()
         self.first_attacked = False 
         self.state = self.get_current_state()  # 獲取遊戲初始狀態
         self.previous_state = self.state
@@ -27,7 +29,6 @@ class HollowKnightEnv:
         self.boss_health = 636
         self.step_count = 0
         return self.state
-
     def step(self, action):
         """
         執行動作，計算下一狀態、獎勵和是否結束

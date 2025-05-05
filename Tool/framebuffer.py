@@ -24,7 +24,7 @@ class FrameBuffer(threading.Thread):
         - 添加批次維度
         """
         state = torch.tensor(frame).permute(2, 0, 1)  # 調整通道順序
-        state = torch.tensor(state, dtype=torch.float32) / 255.0  # 歸一化
+        state =  state.clone().detach().to(torch.float32) / 255.0  # 歸一化
         state = state.unsqueeze(0)  # 添加批次維度
         # state = state.unsqueeze(0)
         return state

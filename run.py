@@ -18,16 +18,22 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
 model =  Q_construct_3d(height=1280 // 4, width=720 // 4, num_actions=6, image_channels=4).to(device)
+target_model = Q_construct_3d(height=1280 // 4, width=720 // 4, num_actions=6, image_channels=4).to(device)
+target_model.load_state_dict(model.state_dict())  
+target_model.eval()
+update_count = 0
+
 frame_buffer = framebuffer.FrameBuffer(windows_name="HOLLOW KNIGHT", buffer_size=4, capture_interval=0.05)
-epsilon = 0
+epsilon = 1
 epsilon_min = 0.1  # 最小探索機率
 epsilon_decay = 0.995  
 gridsize = 15
 GAMMA = 0.9
+TARGET_UPDATE_FREQUENCY = 100
 optimizer = torch.optim.Adam(model.parameters(), lr = 1e-5)
 memory = ReplayMemory(1000)
 env = HollowKnightEnv()
-
+frame_buffer.start()
 def run_episode(num_games):
     run = True
     move = 0
@@ -35,10 +41,10 @@ def run_episode(num_games):
     total_reward = 0
     episode_games = 0
     len_array = []
-    frame_buffer.start()
+    
     while run:
         frames = frame_buffer.get_latest_frames()
-        print("正在執行動作") 
+     
         # state = screngrap.screngrap.grap('HOLLOW KNIGHT')ㄇ
         # state = torch.tensor(state).permute(2, 0, 1)
         # state = torch.tensor(state, dtype=torch.fㄨloat32) / 255.0
@@ -55,7 +61,7 @@ def run_episode(num_games):
                 print("模型：" + str(action))
         else:
             action = np.random.randint(0, 6)
-            print("隨機：" + str(action))
+            # print("隨機：" + str(action))
         env.state = frames 
      
         reward , done = env.step(action)
@@ -69,50 +75,106 @@ def run_episode(num_games):
         episode_games += 1
         epsilon = max(epsilon_min, epsilon * epsilon_decay)  # 確保 epsilon 不小於 epsilon_min
         if done == True:
+
             run = False 
             # len_array.append(len_of_snake)
             # board.resetgame()
             if num_games == games_played:
                 run = False
-
+    print("第一回合結束")
     # avg_len_of_snake = np.mean(len_array)
     # max_len_of_snake = np.max(len_array)
-    return total_reward, avg_len_of_snake, max_len_of_snake
+    return total_reward
 
 
 MSE = nn.MSELoss()
 
+def learn(num_updates, batch_size, target_model, update_count):
+    """
+    使用 DQN 的學習過程，更新模型參數並計算總損失。
 
-def learn(num_updates, batch_size):
+    Args:
+        num_updates (int): 執行更新的次數。
+        batch_size (int): 每次更新中使用的批次大小。
+        target_model (torch.nn.Module): 用於計算 Q 目標值的目標網路。
+        update_count (int): 用於追蹤更新次數，控制目標網路的同步頻率。
+
+    Returns:
+        total_loss (float): 總損失值。
+        update_count (int): 更新次數。
+    """
     total_loss = 0
 
-    for i in range(num_updates):
+    for _ in range(num_updates):
         optimizer.zero_grad()
+
+        # 從回放緩衝區取樣
         sample = memory.sample(batch_size)
-
         states, actions, rewards, next_states, dones = sample
-        states = torch.cat([x.unsqueeze(0) for x in states], dim=0)
-        actions = torch.LongTensor(actions)
-        rewards = torch.FloatTensor(rewards)
-        next_states = torch.cat([x.unsqueeze(0) for x in next_states])
-        dones = torch.FloatTensor(dones)
 
-        q_local = model.forward(states)
-        next_q_value = model.forward(next_states)
+        # 將取樣轉換為張量
+        states = torch.cat([x.unsqueeze(0) for x in states], dim=0).to(device)
+        actions = torch.LongTensor(actions).to(device)
+        rewards = torch.FloatTensor(rewards).to(device)
+        next_states = torch.cat([x.unsqueeze(0) for x in next_states], dim=0).to(device)
+        dones = torch.FloatTensor(dones).to(device)
 
-        Q_expected = q_local.gather(1, actions.unsqueeze(0).transpose(0, 1)).transpose(0, 1).squeeze(0)
+        # 計算當前 Q 值
+        q_local = model(states)
+        Q_expected = q_local.gather(1, actions.unsqueeze(1)).squeeze(1)
 
-        Q_targets_next = torch.max(next_q_value, 1)[0] * (torch.ones(dones.size()) - dones)
+        # 使用目標網路計算 Q_targets_next
+        with torch.no_grad():
+            next_q_value = target_model(next_states)
+            Q_targets_next = torch.max(next_q_value, dim=1)[0] * (1 - dones)
 
+        # 計算目標 Q 值
         Q_targets = rewards + GAMMA * Q_targets_next
 
+        # 損失函數
         loss = MSE(Q_expected, Q_targets)
 
-        total_loss += loss
+        # 更新參數
+        total_loss += loss.item()
         loss.backward()
         optimizer.step()
 
-    return total_loss
+        # 更新目標網路參數（定期同步）
+        update_count += 1
+        if update_count % TARGET_UPDATE_FREQUENCY == 0:
+            target_model.load_state_dict(model.state_dict())
+
+    return total_loss, update_count
+# def learn(num_updates, batch_size):
+#     total_loss = 0
+
+#     for i in range(num_updates):
+#         optimizer.zero_grad()
+#         sample = memory.sample(batch_size)
+
+#         states, actions, rewards, next_states, dones = sample
+#         states = torch.cat([x.unsqueeze(0) for x in states], dim=0)
+#         actions = torch.LongTensor(actions)
+#         rewards = torch.FloatTensor(rewards)
+#         next_states = torch.cat([x.unsqueeze(0) for x in next_states])
+#         dones = torch.FloatTensor(dones)
+
+#         q_local = model.forward(states)
+#         next_q_value = model.forward(next_states)
+
+#         Q_expected = q_local.gather(1, actions.unsqueeze(0).transpose(0, 1)).transpose(0, 1).squeeze(0)
+
+#         Q_targets_next = torch.max(next_q_value, 1)[0] * (torch.ones(dones.size()) - dones)
+
+#         Q_targets = rewards + GAMMA * Q_targets_next
+
+#         loss = MSE(Q_expected, Q_targets)
+
+#         total_loss += loss
+#         loss.backward()
+#         optimizer.step()
+
+#     return total_loss
 
 
 num_episodes = 60000
@@ -131,28 +193,29 @@ def train():
     for i_episode in range(1, num_episodes + 1):
         # 初始化環境
         env.reset()  # 假設 `HollowKnightEnv` 提供 reset 方法
-        score, _, _ = run_episode(games_in_episode)  # 運行一個回合
+        score = run_episode(games_in_episode)  # 運行一個回合
+        time.sleep(5)
+        # print(score)
+        # scores_deque.append(score)  # 添加本次回合分數
+        # scores_array.append(score)  # 保存分數
+        # avg_score = np.mean(scores_deque)  # 計算最近100回合的平均分
+        # avg_scores_array.append(avg_score)  # 保存平均分數
 
-        scores_deque.append(score)  # 添加本次回合分數
-        scores_array.append(score)  # 保存分數
-        avg_score = np.mean(scores_deque)  # 計算最近100回合的平均分
-        avg_scores_array.append(avg_score)  # 保存平均分數
+        # # 更新 Q 網絡
+        # total_loss = learn(num_updates, batch_size)
 
-        # 更新 Q 網絡
-        total_loss = learn(num_updates, batch_size)
+        # # 打印訓練進度
+        # if i_episode % print_every == 0:
+        #     elapsed_time = int(time.time() - time_start)
+        #     print(
+        #         f"Ep.: {i_episode:6}, Loss: {total_loss:.3f}, "
+        #         f"Avg.Score: {avg_score:.2f}, "
+        #         f"Time: {elapsed_time // 3600:02}:{elapsed_time % 3600 // 60:02}:{elapsed_time % 60:02}"
+        #     )
 
-        # 打印訓練進度
-        if i_episode % print_every == 0:
-            elapsed_time = int(time.time() - time_start)
-            print(
-                f"Ep.: {i_episode:6}, Loss: {total_loss:.3f}, "
-                f"Avg.Score: {avg_score:.2f}, "
-                f"Time: {elapsed_time // 3600:02}:{elapsed_time % 3600 // 60:02}:{elapsed_time % 60:02}"
-            )
-
-        # 保存模型檔案
-        if i_episode % 1000 == 0:
-            torch.save(model.state_dict(), f'./dir_chk_len/HollowKnight_{i_episode}.pth')
+        # # 保存模型檔案
+        # if i_episode % 1000 == 0:
+        #     torch.save(model.state_dict(), f'./dir_chk_len/HollowKnight_{i_episode}.pth')
 
     # 返回訓練結果
     return scores_array, avg_scores_array
