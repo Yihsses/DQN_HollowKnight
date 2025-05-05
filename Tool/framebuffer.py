@@ -8,7 +8,6 @@ from Tool import screngrap
 class FrameBuffer(threading.Thread):
     def __init__(self, windows_name, buffer_size=4, capture_interval=0.05):
         super(FrameBuffer, self).__init__()
-        self.deivce = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.windows_name = windows_name
         self.buffer_size = buffer_size
         self.capture_interval = capture_interval
@@ -23,10 +22,10 @@ class FrameBuffer(threading.Thread):
         - 歸一化至 [0, 1]
         - 添加批次維度
         """
-        state = torch.tensor(frame).permute(2, 0, 1)  # 調整通道順序
-        state =  state.clone().detach().to(torch.float32) / 255.0  # 歸一化
+        # state = torch.tensor(frame).permute(2, 0, 1)  # 調整通道順序
+        state = torch.tensor(frame, dtype=torch.float32) / 255.0 # 歸一化
         state = state.unsqueeze(0)  # 添加批次維度
-        # state = state.unsqueeze(0)
+        state = state.unsqueeze(0)
         return state
 
     def run(self):

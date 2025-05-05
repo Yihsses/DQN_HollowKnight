@@ -17,21 +17,21 @@ from hollowknight_env import HollowKnightEnv
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-model =  Q_construct_3d(height=1280 // 4, width=720 // 4, num_actions=6, image_channels=4).to(device)
-target_model = Q_construct_3d(height=1280 // 4, width=720 // 4, num_actions=6, image_channels=4).to(device)
+model =  Q_construct_3d(height=1280 // 4, width=720 // 4, num_actions=6, image_channels=1).to(device)
+target_model = Q_construct_3d(height=1280 // 4, width=720 // 4, num_actions=6, image_channels=1).to(device)
 target_model.load_state_dict(model.state_dict())  
 target_model.eval()
 update_count = 0
 
 frame_buffer = framebuffer.FrameBuffer(windows_name="HOLLOW KNIGHT", buffer_size=4, capture_interval=0.05)
-epsilon = 1
+epsilon = -1
 epsilon_min = 0.1  # 最小探索機率
 epsilon_decay = 0.995  
 gridsize = 15
 GAMMA = 0.9
 TARGET_UPDATE_FREQUENCY = 100
 optimizer = torch.optim.Adam(model.parameters(), lr = 1e-5)
-memory = ReplayMemory(1000)
+memory = ReplayMemory(100)
 env = HollowKnightEnv()
 frame_buffer.start()
 def run_episode(num_games):
@@ -68,8 +68,8 @@ def run_episode(num_games):
         frames = frame_buffer.get_latest_frames()
         env.previous_state = env.state
         env.state = frames
-        memory.push( env.previous_state, action, reward, env.state , done)
-
+        memory.push(env.previous_state, action, reward, env.state , done)
+        memory.truncate()
         total_reward += reward
 
         episode_games += 1
@@ -81,6 +81,7 @@ def run_episode(num_games):
             # board.resetgame()
             if num_games == games_played:
                 run = False
+    
     print("第一回合結束")
     # avg_len_of_snake = np.mean(len_array)
     # max_len_of_snake = np.max(len_array)
@@ -143,7 +144,7 @@ def learn(num_updates, batch_size, target_model, update_count):
         update_count += 1
         if update_count % TARGET_UPDATE_FREQUENCY == 0:
             target_model.load_state_dict(model.state_dict())
-
+        
     return total_loss, update_count
 # def learn(num_updates, batch_size):
 #     total_loss = 0

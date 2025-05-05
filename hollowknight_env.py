@@ -19,7 +19,7 @@ class HollowKnightEnv:
         """
         重置環境到初始狀態
         """
-        restart()
+        # restart()
         self.first_attacked = False 
         self.state = self.get_current_state()  # 獲取遊戲初始狀態
         self.previous_state = self.state
