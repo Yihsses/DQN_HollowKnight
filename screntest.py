@@ -1,4 +1,6 @@
 from Tool.screngrap import screngrap
+from Tool.action import  take_action
+take_action(2)
 while True :
     hp = screngrap.grap_Boss_hp("Hollow Knight")
     # 60

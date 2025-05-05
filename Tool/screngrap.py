@@ -22,7 +22,7 @@ class screngrap():
             win32gui.SetForegroundWindow(hwnd_target)
         except:
             print("error")
-        time.sleep(1.0)
+        # time.sleep(1.0)
 
         # 截圖
         hdesktop = win32gui.GetDesktopWindow()
@@ -49,12 +49,12 @@ class screngrap():
         win32gui.ReleaseDC(hdesktop, hwndDC)
 
         # 使用 PIL 調整大小到 1280x720
-        pil_img = Image.fromarray(img)
+        pil_img = Image.fromarray(img, 'RGBA')
+        pil_img = pil_img.convert('L') 
         resized_img = pil_img.resize((1280, 720), Image.Resampling.LANCZOS)
-        resized_img.save("test.png")
         # 轉回 NumPy 陣列
         resized_img_np = np.array(resized_img)
-
+        
         return resized_img_np
     def grap_hp(Windowsname):
         """
@@ -79,7 +79,6 @@ class screngrap():
             win32gui.SetForegroundWindow(hwnd_target)
         except Exception as e:
             print("無法設置前景窗口:", e)
-        time.sleep(1.0)
 
         # 截圖
         hdesktop = win32gui.GetDesktopWindow()
@@ -107,8 +106,8 @@ class screngrap():
 
         # 保存圖片
         pil_img = Image.fromarray(img)
-        pil_img.save("hp.png")
-        print("HP 圖片已保存為 'hp.png'")
+        # pil_img.save("hp.png")
+        # print("HP 圖片已保存為 'hp.png'")
         resized_img_np = np.array(pil_img)
         return np.array(resized_img_np)
     def grap_Boss_hp(Windowsname):
@@ -134,7 +133,6 @@ class screngrap():
             win32gui.SetForegroundWindow(hwnd_target)
         except Exception as e:
             print("無法設置前景窗口:", e)
-        time.sleep(1.0)
 
         # 截圖
         hdesktop = win32gui.GetDesktopWindow()
@@ -162,7 +160,7 @@ class screngrap():
 
         # 保存圖片
         pil_img = Image.fromarray(img)
-        pil_img.save("hp_boss.png")
-        print("HP 圖片已保存為 'hp.png'")
+        # pil_img.save("hp_boss.png")
+        # print("HP 圖片已保存為 'hp.png'")
         resized_img_np = np.array(pil_img)
         return np.array(resized_img_np)

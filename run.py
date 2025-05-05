@@ -3,8 +3,8 @@ import torch.nn as nn
 
 import numpy as np
 import random
-from dqnnet import Q_construct
-from dqnnet import QNetwork
+from dqn_3cnn import Q_construct_3d
+# from dqnnet import QNetwork
 # from DQN_HollowKnight.dqn_net import QNetworktest
 from Tool import screngrap
 from collections import deque
@@ -13,7 +13,11 @@ import matplotlib.pyplot as plt
 from replay_buff import ReplayMemory
 from Tool import framebuffer
 from hollowknight_env import HollowKnightEnv
-model =  Q_construct(input_dim=int((1280/4)*(720/4)), num_actions=6,image_channels=4)
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
+
+model =  Q_construct_3d(height=1280 // 4, width=720 // 4, num_actions=6, image_channels=1).to(device)
 frame_buffer = framebuffer.FrameBuffer(windows_name="HOLLOW KNIGHT", buffer_size=4, capture_interval=0.05)
 epsilon = 0
 epsilon_min = 0.1  # 最小探索機率
@@ -34,26 +38,30 @@ def run_episode(num_games):
     frame_buffer.start()
     while run:
         frames = frame_buffer.get_latest_frames()
-        # state = screngrap.screngrap.grap('HOLLOW KNIGHT')
+        print("正在執行動作")
+        # state = screngrap.screngrap.grap('HOLLOW KNIGHT')ㄇ
         # state = torch.tensor(state).permute(2, 0, 1)
-        # state = torch.tensor(state, dtype=torch.float32) / 255.0
+        # state = torch.tensor(state, dtype=torch.fㄨloat32) / 255.0
         # state = state.unsqueeze(0)
         # action_0 = model.forward(state)
         # rand = np.random.uniform(0, 1)
         rand = np.random.uniform(0, 1)  # 隨機生成一個 0 到 1 之間的數字
         action = 0
         global epsilon 
-        if rand > epsilon:
-            if(frames != None):
-                if(len(frames)>=4):
-                    action_0 = model(frame.s)
-                    action =  action_0
+        if rand > epsilon and frames != None:
+            if(len(frames)>=4):
+                frames = frames.permute(1, 0, 2, 3).unsqueeze(0).to(device)
+                action = torch.argmax(model(frames), dim=1).item()
+                print("模型：" + str(action))
         else:
             action = np.random.randint(0, 6)
+            print("隨機：" + str(action))
         env.state = frames 
+     
         reward , done = env.step(action)
-
+        print("動作執行完")
         frames = frame_buffer.get_latest_frames()
+ 
         env.previous_state = env.state
         env.state = frames
         memory.push( env.previous_state, action, reward, env.state , done)
@@ -69,8 +77,8 @@ def run_episode(num_games):
             if num_games == games_played:
                 run = False
 
-    avg_len_of_snake = np.mean(len_array)
-    max_len_of_snake = np.max(len_array)
+    # avg_len_of_snake = np.mean(len_array)
+    # max_len_of_snake = np.max(len_array)
     return total_reward, avg_len_of_snake, max_len_of_snake
 
 

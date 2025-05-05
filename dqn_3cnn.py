@@ -73,7 +73,7 @@ class QNetwork3D(nn.Module):
         x = F.relu(self.fc3(x))
         x = self.dropout(x)
         x = self.fc4(x)
-        return torch.argmax(x, dim=1).item()
+        return x
 
 def Q_construct_3d(num_actions, time_steps=4, image_channels=3, height=84, width=84):
     return QNetwork3D(num_actions, time_steps, image_channels, height, width)

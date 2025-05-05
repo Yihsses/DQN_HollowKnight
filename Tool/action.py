@@ -30,7 +30,7 @@ O = 0x18
 P = 0x19
 C = 0x2E
 F = 0x21
-Space =  0x20
+Space =  0x39  
 up = 0xC8
 down = 0xD0
 left = 0xCB
@@ -41,9 +41,7 @@ esc = 0x01
 # move actions
 # 0
 def Nothing():
-
     pass
-
 # Move
 # 0
 def Turn_Left():
@@ -89,10 +87,7 @@ def Short_Jump():
 # 3
 def Mid_Jump():
     sendkey.PressKey(Space)
-    time.sleep(0.2)
-    sendkey.ReleaseKey(Space)
-    sendkey.PressKey(Space)
-    time.sleep(0.2)
+    time.sleep(0.4)
     sendkey.ReleaseKey(Space)
     Nothing()
 
