@@ -1,7 +1,7 @@
 import numpy as np
 import time
 from Tool.action import  take_action
-
+from Tool.screngrap import screngrap
 class HollowKnightEnv:
     def __init__(self):
         # 初始化環境屬性
@@ -20,7 +20,7 @@ class HollowKnightEnv:
         self.previous_state = self.state
         self.done = False
         self.score = 0
-        self.health = 100
+        self.health = 8
         self.step_count = 0
         return self.state
 
@@ -92,6 +92,12 @@ class HollowKnightEnv:
         獲取當前健康值
         可以通過遊戲 API 或畫面像素分析獲得
         """
+        hp = screngrap.grap_hp("Hollow Knight")
+        hp = 0
+        for i in range(23,310,39):
+            if(hp[20][i][0] > 190):
+                hp+=1
+        self.health = hp
         return self.health  # 示例：直接返回屬性
 
     def get_score(self):

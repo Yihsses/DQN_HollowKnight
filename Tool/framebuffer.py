@@ -44,6 +44,12 @@ class FrameBuffer(threading.Thread):
     def get_latest_frames(self):
         """
         獲取最新的 4 幀影像。
+
+
+
+
+
+        
         返回:
         - 如果緩衝區不足 4 幀，返回 None。
         - 如果緩衝區有足夠的影像，返回形狀為 (4, C, H, W) 的 PyTorch 張量。
