@@ -46,7 +46,7 @@ def run_episode(num_games):
         if rand > epsilon:
             if(frames != None):
                 if(len(frames)>=4):
-                    action_0 = model(frames)
+                    action_0 = model(frame.s)
                     action =  action_0
         else:
             action = np.random.randint(0, 6)
