@@ -23,10 +23,10 @@ class FrameBuffer(threading.Thread):
         - 歸一化至 [0, 1]
         - 添加批次維度
         """
-        #  state = torch.tensor(frame).permute(2, 0, 1)  # 調整通道順序
-        state = torch.tensor(frame, dtype=torch.float32) / 255.0  # 歸一化
+        state = torch.tensor(frame).permute(2, 0, 1)  # 調整通道順序
+        state = torch.tensor(state, dtype=torch.float32) / 255.0  # 歸一化
         state = state.unsqueeze(0)  # 添加批次維度
-        state = state.unsqueeze(0)
+        # state = state.unsqueeze(0)
         return state
 
     def run(self):
@@ -51,10 +51,7 @@ class FrameBuffer(threading.Thread):
         - 如果緩衝區不足 4 幀，返回 None。
         - 如果緩衝區有足夠的影像，返回形狀為 (4, C, H, W) 的 PyTorch 張量。
         """
-        start_time = time.time()  # 開始計時
         if len(self.buffer) < self.buffer_size:
             return None  # 不足 4 幀時返回 None
         result = torch.cat(list(self.buffer), dim=0)  # 堆疊成多幀影像
-        end_time = time.time()  # 結束計時
-        print(f"處理時間: {end_time - start_time:.6f} 秒")  # 輸出處理時間
         return result

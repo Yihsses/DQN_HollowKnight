@@ -17,7 +17,7 @@ from hollowknight_env import HollowKnightEnv
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-model =  Q_construct_3d(height=1280 // 4, width=720 // 4, num_actions=6, image_channels=1).to(device)
+model =  Q_construct_3d(height=1280 // 4, width=720 // 4, num_actions=6, image_channels=4).to(device)
 frame_buffer = framebuffer.FrameBuffer(windows_name="HOLLOW KNIGHT", buffer_size=4, capture_interval=0.05)
 epsilon = 0
 epsilon_min = 0.1  # 最小探索機率
@@ -38,7 +38,7 @@ def run_episode(num_games):
     frame_buffer.start()
     while run:
         frames = frame_buffer.get_latest_frames()
-        print("正在執行動作")
+        print("正在執行動作") 
         # state = screngrap.screngrap.grap('HOLLOW KNIGHT')ㄇ
         # state = torch.tensor(state).permute(2, 0, 1)
         # state = torch.tensor(state, dtype=torch.fㄨloat32) / 255.0
@@ -59,9 +59,7 @@ def run_episode(num_games):
         env.state = frames 
      
         reward , done = env.step(action)
-        print("動作執行完")
         frames = frame_buffer.get_latest_frames()
- 
         env.previous_state = env.state
         env.state = frames
         memory.push( env.previous_state, action, reward, env.state , done)

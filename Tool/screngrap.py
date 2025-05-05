@@ -49,8 +49,8 @@ class screngrap():
         win32gui.ReleaseDC(hdesktop, hwndDC)
 
         # 使用 PIL 調整大小到 1280x720
-        pil_img = Image.fromarray(img, 'RGBA')
-        pil_img = pil_img.convert('L') 
+        pil_img = Image.fromarray(img)
+        # pil_img = pil_img.convert('L') 
         resized_img = pil_img.resize((1280, 720), Image.Resampling.LANCZOS)
         # 轉回 NumPy 陣列
         resized_img_np = np.array(resized_img)
