@@ -65,14 +65,14 @@ class HollowKnightEnv:
         boss_health_diff = self.get_boss_health() - self.boss_health
 
         if health_diff < 0:
-            reward -= 6  # 損失健康值，給負獎勵
+            reward -= 60  # 損失健康值，給負獎勵
             print("扣血")
         
-        if(boss_health_diff < 0):
+        if(boss_health_diff < 0 and action == 0 ):
             print("攻擊成功")
-            reward += 2
-        if(action == 0 and boss_health_diff >= 0):
-            reward -= 1
+            reward += 20
+        if( boss_health_diff >= 0 and action == 0):
+            reward -= 10
         # 示例：根據分數增長計算獎勵
         # 更新當前健康值和分數
         return reward

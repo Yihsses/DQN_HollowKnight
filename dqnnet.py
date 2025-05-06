@@ -37,11 +37,11 @@ class QNetwork(nn.Module):
         batch_size = img_feat.size(0)
         img_feat = img_feat.view(batch_size, -1)
         x = F.relu(self.fc1(img_feat))
-        x = self.dropout(x)
+        # x = self.dropout(x)
         x = F.relu(self.fc2(x))
-        x = self.dropout(x)
+        # x = self.dropout(x)
         x = F.relu(self.fc3(x))
-        x = self.dropout(x)
+        # x = self.dropout(x)
         x = self.fc4(x)
         return x
 

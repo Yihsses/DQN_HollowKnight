@@ -6,7 +6,7 @@ import torch
 from Tool import screngrap
 
 class FrameBuffer(threading.Thread):
-    def __init__(self, windows_name, buffer_size=4, capture_interval=0.05):
+    def __init__(self, windows_name, buffer_size=4, capture_interval=0.2):
         super(FrameBuffer, self).__init__()
         self.windows_name = windows_name
         self.buffer_size = buffer_size
@@ -15,17 +15,13 @@ class FrameBuffer(threading.Thread):
         self.running = False
 
     def preprocess_frame(self, frame):
-        """
-        對影像進行預處理：
-        - 轉換為 PyTorch 張量
-        - 通道順序變更為 (C, H, W)
-        - 歸一化至 [0, 1]
-        - 添加批次維度
-        """
-        # state = torch.tensor(frame).permute(2, 0, 1)  # 調整通道順序
-        state = torch.tensor(frame, dtype=torch.float32) / 255.0 # 歸一化
+        # state = torch.tensor(frame).unsqueeze(0)  # 調整通道順序
+        # state = torch.tensor(frame, dtype=torch.float32) / 255.0 # 歸一化
+        # state = state.unsqueeze(0)  # 添加批次維度
+
+        state = torch.tensor(frame, dtype=torch.float32) / 255.0  # 歸一化
         state = state.unsqueeze(0)  # 添加批次維度
-        state = state.unsqueeze(0)
+        # return state
         return state
 
     def run(self):
@@ -34,7 +30,7 @@ class FrameBuffer(threading.Thread):
         while self.running:
             # 抓取單幀影像
             frame = screngrap.screngrap.grap(self.windows_name)
-            preprocessed_frame = self.preprocess_frame(frame)  # 預處理影像
+            preprocessed_frame = self.preprocess_frame(frame)  # 預處理影像d
             self.buffer.append(preprocessed_frame)  # 保存到緩衝區
             time.sleep(self.capture_interval)  # 等待間隔
 
@@ -43,15 +39,20 @@ class FrameBuffer(threading.Thread):
         self.running = False
 
     def get_latest_frames(self):
-        """
-        獲取最新的 4 幀影像。
-
-        返回:
-        - 如果緩衝區不足 4 幀，返回 None。
-        - 如果緩衝區有足夠的影像，返回形狀為 (4, C, H, W) 的 PyTorch 張量。
-        """
         if len(self.buffer) < self.buffer_size:
             return None  # 不足 4 幀時返回 None
-        # result = torch.cat(list(self.buffer), dim=0)  # 堆疊成多幀影像
-        # return result
-        return self.buffer[0]
+        
+        # 堆疊成多幀影像 (4, 1, 200, 400)
+ # [4, 1, 200, 400]
+        stacked_frames = torch.stack(list(self.buffer), dim=0)
+        stacked_frames = stacked_frames.view(1, -1, stacked_frames.shape[1], stacked_frames.shape[2])  # [1, 12, 400, 200]
+        # 重新排列維度，形成 (1, 4, 200, 400)
+     # [1, 4, 200, 400]
+        return stacked_frames
+    def get_latest_3d_frames(self):
+
+        if len(self.buffer) < self.buffer_size:
+            return None  # 不足 4 幀時返回 None
+        stacked_frames = torch.cat(list(self.buffer), dim=0)
+        stacked_frames = stacked_frames.permute(3, 0, 1, 2).unsqueeze(0)  
+        return stacked_frames
