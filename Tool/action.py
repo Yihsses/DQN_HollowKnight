@@ -54,12 +54,12 @@ def Turn_Right():
 
 def Move_Left():
     sendkey.PressKey(A)
-    time.sleep(0.01)
+    time.sleep(0.1)
     sendkey.ReleaseKey(A)
 # 1
 def Move_Right():
     sendkey.PressKey(D)
-    time.sleep(0.01)
+    time.sleep(0.1)
     sendkey.ReleaseKey(D)
 
 def Attack():

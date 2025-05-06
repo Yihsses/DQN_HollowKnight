@@ -11,7 +11,7 @@ class HollowKnightEnv:
         self.previous_state = None  # 前一狀態，用於計算差異
         self.done = False  # 是否結束
         self.score = 0  # 遊戲分數
-        self.health = 100  # 假設有健康值
+        self.health =8  # 假設有健康值
         self.step_count = 0  # 當前步數
         self.boss_health = 636
         self.first_attacked = False 
@@ -19,7 +19,7 @@ class HollowKnightEnv:
         """
         重置環境到初始狀態
         """
-        # restart()
+        restart()
         self.first_attacked = False 
         self.state = self.get_current_state()  # 獲取遊戲初始狀態
         self.previous_state = self.state
@@ -44,8 +44,9 @@ class HollowKnightEnv:
         # self.state = self.get_current_state()
         
         # 計算獎勵
-        reward = self.calculate_reward()
-
+        reward = self.calculate_reward(action)
+        self.health = self.get_health()
+        self.boss_health = self.get_boss_health()
         # 更新是否結束
         self.done = self.check_done()
 
@@ -54,22 +55,25 @@ class HollowKnightEnv:
 
         return reward, self.done
 
-    def calculate_reward(self):
+    def calculate_reward(self,action):
         """
         計算獎勵
         """
         reward = 0
         # 示例：根據健康值變化計算獎勵
-        health_diff = self.health - self.get_health()
+        health_diff = self.get_health() - self.health
+
+
         if health_diff < 0:
-            reward -= 10  # 損失健康值，給負獎勵
+            reward -= 6  # 損失健康值，給負獎勵
+            print("扣血")
         boss_health_diff = self.get_boss_health() - self.boss_health
         if(boss_health_diff < 0):
-            reward += 30
+            reward += 2
+        if(action == 0 and boss_health_diff >= 0):
+            reward -= 1
         # 示例：根據分數增長計算獎勵
         # 更新當前健康值和分數
-        self.health = self.get_health()
-        self.boss_health = self.get_boss_health()
         return reward
 
     def check_done(self):
