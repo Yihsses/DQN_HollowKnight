@@ -52,5 +52,6 @@ class FrameBuffer(threading.Thread):
         """
         if len(self.buffer) < self.buffer_size:
             return None  # 不足 4 幀時返回 None
-        result = torch.cat(list(self.buffer), dim=0)  # 堆疊成多幀影像
-        return result
+        # result = torch.cat(list(self.buffer), dim=0)  # 堆疊成多幀影像
+        # return result
+        return self.buffer[0]

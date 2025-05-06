@@ -46,5 +46,5 @@ class QNetwork(nn.Module):
         return x
 
 
-def Q_construct(input_dim, num_actions, image_channels=3):
+def Q_construct(input_dim, num_actions, image_channels=4):
     return QNetwork(input_dim=input_dim, num_actions=num_actions, image_channels=image_channels)

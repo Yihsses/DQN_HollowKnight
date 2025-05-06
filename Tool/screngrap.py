@@ -81,38 +81,39 @@ class screngrap():
             print("無法設置前景窗口:", e)
 
         # 截圖
-        try:
-            hdesktop = win32gui.GetDesktopWindow()
-            hwndDC = win32gui.GetWindowDC(hdesktop)
-            mfcDC = win32ui.CreateDCFromHandle(hwndDC)
-            saveDC = mfcDC.CreateCompatibleDC()
+        while True :
+            try:
+                hdesktop = win32gui.GetDesktopWindow()
+                hwndDC = win32gui.GetWindowDC(hdesktop)
+                mfcDC = win32ui.CreateDCFromHandle(hwndDC)
+                saveDC = mfcDC.CreateCompatibleDC()
 
-            saveBitMap = win32ui.CreateBitmap()
-            saveBitMap.CreateCompatibleBitmap(mfcDC, w, h)
-            saveDC.SelectObject(saveBitMap)
+                saveBitMap = win32ui.CreateBitmap()
+                saveBitMap.CreateCompatibleBitmap(mfcDC, w, h)
+                saveDC.SelectObject(saveBitMap)
 
-            saveDC.BitBlt((0, 0), (w, h), mfcDC, (left, top), win32con.SRCCOPY)
+                saveDC.BitBlt((0, 0), (w, h), mfcDC, (left, top), win32con.SRCCOPY)
 
-            # 將位圖轉換為 NumPy 陣列
-            bmpinfo = saveBitMap.GetInfo()
-            bmpstr = saveBitMap.GetBitmapBits(True)
-            img = np.frombuffer(bmpstr, dtype='uint8')
-            img.shape = (h, w, 4)
+                # 將位圖轉換為 NumPy 陣列
+                bmpinfo = saveBitMap.GetInfo()
+                bmpstr = saveBitMap.GetBitmapBits(True)
+                img = np.frombuffer(bmpstr, dtype='uint8')
+                img.shape = (h, w, 4)
 
-            # 清理資源
-            win32gui.DeleteObject(saveBitMap.GetHandle())
-            saveDC.DeleteDC()
-            mfcDC.DeleteDC()
-            win32gui.ReleaseDC(hdesktop, hwndDC)
+                # 清理資源
+                win32gui.DeleteObject(saveBitMap.GetHandle())
+                saveDC.DeleteDC()
+                mfcDC.DeleteDC()
+                win32gui.ReleaseDC(hdesktop, hwndDC)
 
-            # 保存圖片
-            pil_img = Image.fromarray(img)
-            # pil_img.save("hp.png")
-            # print("HP 圖片已保存為 'hp.png'")
-            resized_img_np = np.array(pil_img)
-            return np.array(resized_img_np)
-        except Exception as e:
-            print(e)
+                # 保存圖片
+                pil_img = Image.fromarray(img)
+                # pil_img.save("hp.png")
+                # print("HP 圖片已保存為 'hp.png'")
+                resized_img_np = np.array(pil_img)
+                return np.array(resized_img_np)
+            except Exception as e:
+                print(e)
      
     def grap_Boss_hp(Windowsname):
         """

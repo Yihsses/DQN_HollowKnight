@@ -37,7 +37,7 @@ class HollowKnightEnv:
         # take_action(action)
         action_thread = TackAction(threadID=1, name="ActionThread", direction=None, action=action)  # 0 代表 Attack
         action_thread.start()
-        time.sleep(0.05)  # 動作延遲 (根據需要調整)
+        time.sleep(0.02)  # 動作延遲 (根據需要調整)
 
         # 更新狀態
         # self.previous_state = self.state
@@ -62,13 +62,14 @@ class HollowKnightEnv:
         reward = 0
         # 示例：根據健康值變化計算獎勵
         health_diff = self.get_health() - self.health
-
+        boss_health_diff = self.get_boss_health() - self.boss_health
 
         if health_diff < 0:
             reward -= 6  # 損失健康值，給負獎勵
             print("扣血")
-        boss_health_diff = self.get_boss_health() - self.boss_health
+        
         if(boss_health_diff < 0):
+            print("攻擊成功")
             reward += 2
         if(action == 0 and boss_health_diff >= 0):
             reward -= 1
@@ -103,10 +104,11 @@ class HollowKnightEnv:
                 now_hp+=1
         if(now_hp <= 0 and  self.first_attacked):
             now_hp = 0
-        else :
+        elif( self.first_attacked == False and now_hp == 0 ):
             now_hp = self.boss_health
-        if(now_hp != self.boss_health):
+        if(now_hp == 622):
             self.first_attacked = True
+        # print(now_hp)
         return now_hp
     def get_health(self):
         """

@@ -3,6 +3,7 @@ import torch.nn as nn
 import gc
 import numpy as np
 import random
+from dqnnet import Q_construct
 from dqn_3cnn import Q_construct_3d
 # from dqnnet import QNetwork
 # from DQN_HollowKnight.dqn_net import QNetworktest
@@ -17,13 +18,14 @@ import torch.cuda.amp as amp
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
-
-model =  Q_construct_3d(height=1280 // 4, width=720 // 4, num_actions=6, image_channels=1).to(device)
-target_model = Q_construct_3d(height=1280 // 4, width=720 // 4, num_actions=6, image_channels=1).to(device)
+model =  Q_construct(input_dim=int((1280/4)*(720/4)), num_actions=6,image_channels=1).to(device)
+target_model =Q_construct(input_dim=int((1280/4)*(720/4)), num_actions=6,image_channels=1).to(device)
+# model =  Q_construct_3d(height=1280 // 4, width=720 // 4, num_actions=6, image_channels=1).to(device)
+# target_model = Q_construct_3d(height=1280 // 4, width=720 // 4, num_actions=6, image_channels=1).to(device)
 
 update_count = 0
 
-frame_buffer = framebuffer.FrameBuffer(windows_name="HOLLOW KNIGHT", buffer_size=4, capture_interval=0.05)
+frame_buffer = framebuffer.FrameBuffer(windows_name="HOLLOW KNIGHT", buffer_size=1, capture_interval=0.02)
 epsilon = -1
 epsilon_min = 0.1  # 最小探索機率
 epsilon_decay = 0.995  
@@ -46,7 +48,6 @@ def run_episode(num_games):
     
     while run:
         frames = frame_buffer.get_latest_frames()
-         
         # state = screngrap.screngrap.grap('HOLLOW KNIGHT')ㄇ
         # state = torch.tensor(state).permute(2, 0, 1)
         # state = torch.tensor(state, dtype=torch.fㄨloat32) / 255.0
@@ -57,18 +58,19 @@ def run_episode(num_games):
         action = 0
         global epsilon 
         if rand > epsilon and frames != None:
-            if(len(frames)>=4):
-                frames = frames.permute(1, 0, 2, 3).unsqueeze(0)
-                action = torch.argmax(model(frames.to(device)), dim=1).item()
-                print("模型：" + str(action))
+            if(len(frames)>=1):
+                # frames = frames.permute(1, 0, 2, 3).unsqueeze(0)
+                with torch.no_grad():
+                    action = torch.argmax(model(frames.to(device)), dim=1).item()
         else:
-            frames = frames.permute(1, 0, 2, 3).unsqueeze(0)
+            # frames = frames.permute(1, 0, 2, 3).unsqueeze(0)
             action = np.random.randint(0, 6)
             # print("隨機：" + str(action))
-        now_state =  frames.clone()
+        now_state =  frames
         reward , done = env.step(action)
+        time.sleep(0.04)
         frames = frame_buffer.get_latest_frames()
-        next_state = frames.permute(1, 0, 2, 3).unsqueeze(0).clone()
+        next_state = frames
         env.previous_state = now_state
         env.state = next_state
         memory.push(env.previous_state, action, reward, env.state , done)
@@ -78,15 +80,13 @@ def run_episode(num_games):
         episode_games += 1
         epsilon = max(epsilon_min, epsilon * epsilon_decay)  # 確保 epsilon 不小於 epsilon_min
         if done == True:
-
             run = False 
             # len_array.append(len_of_snake)
             # board.resetgame()
             if num_games == games_played:
                 run = False
-        time.sleep(0.2)
-        frame_buffer.stop()
-    print("第一回合結束")
+        frame_buffer.running=False
+    print("結束")
     # avg_len_of_snake = np.mean(len_array)
     # max_len_of_snake = np.max(len_array)
     return total_reward
@@ -96,55 +96,77 @@ MSE = nn.MSELoss()
 
 import torch.amp as amp  # 使用 torch.amp 而非 torch.cuda.amp
 
-def learn(num_updates, batch_size, target_model, update_count):
+import psutil
+
+def learn(num_updates, batch_size, target_model, update_count, accumulation_steps=4):
     total_loss = 0
     scaler = amp.GradScaler()  # 混合精度比例縮放器
     torch.cuda.empty_cache()
     gc.collect()
-    for _ in range(num_updates):
-        optimizer.zero_grad()
+    time.sleep(1)
 
-        # 從回放緩衝區取樣
-        sample = memory.sample(batch_size) 
-        states, actions, rewards, next_states, dones = sample
+    for update in range(num_updates):
+        optimizer.zero_grad()  # 每次大批次（累積步數完成後）重置梯度
+        
+        # 累積梯度
+        for step in range(accumulation_steps):
+            # 從回放緩衝區取樣
+            sample = memory.sample(batch_size)
+            states, actions, rewards, next_states, dones = sample
 
-        # 將數據轉為張量並移動到設備
-        states = torch.cat([x for x in states], dim=0).to(device)
-        actions = torch.LongTensor(actions).to(device)
-        rewards = torch.FloatTensor(rewards).to(device)
-        next_states = torch.cat([x for x in next_states]).to(device)
-        dones = torch.FloatTensor(dones).to(device)
+            # 將數據轉為張量並移動到設備
+            states = torch.cat([x for x in states], dim=0).to(device)
+            actions = torch.LongTensor(actions).to(device)
+            rewards = torch.FloatTensor(rewards).to(device)
+            next_states = torch.cat([x for x in next_states]).to(device)
+            dones = torch.FloatTensor(dones).to(device)
+            gpu_memory_allocated = torch.cuda.memory_allocated(device) / (1024 ** 2)
+            gpu_memory_reserved = torch.cuda.memory_reserved(device) / (1024 ** 2)
+            cpu_memory_used = psutil.Process().memory_info().rss / (1024 ** 2)
 
-        # 啟用混合精度
-        with amp.autocast(device_type='cuda'):  # 設定設備類型
-            # 計算當前 Q 值
-            q_local = model(states)  # 一次性計算整個批次的 Q 值
-            next_q_value = target_model(next_states)  # 一次性計算下一狀態的目標 Q 值
+            print(f"GPU Memory Allocated: {gpu_memory_allocated:.2f} MB")
+            print(f"GPU Memory Reserved: {gpu_memory_reserved:.2f} MB")
+            print(f"CPU Memory Used: {cpu_memory_used:.2f} MB")
+            # 啟用混合精度
+            with amp.autocast(device_type='cuda'):  # 設定設備類型
+                # 計算當前 Q 值
+                next_q_value = target_model.forward(next_states)  # 一次性計算下一狀態的目標 Q 值
+                q_local = model.forward(states)  # 一次性計算整個批次的 Q 值
 
-            # 計算 Q_expected
-            Q_expected = q_local.gather(1, actions.unsqueeze(1)).squeeze(1)  # 按照動作選擇對應 Q 值
+                # 計算 Q_expected 
+                Q_expected = q_local.gather(1, actions.unsqueeze(1)).squeeze(1)  # 按照動作選擇對應 Q 值
 
-            # 計算 Q_targets_next（處理結束狀態，避 免不必要的梯度計算）
-            Q_targets_next = torch.max(next_q_value, dim=1)[0] * (1 - dones)
+                # 計算 Q_targets_next（處理結束狀態，避免不必要的梯度計算）
+                Q_targets_next = torch.max(next_q_value, dim=1)[0] * (1 - dones)
 
-            # 計算目標 Q 值
-            Q_targets = rewards + GAMMA * Q_targets_next
+                # 計算目標 Q 值
+                Q_targets = rewards + GAMMA * Q_targets_next
 
-            # 計算損失
-            loss = MSE(Q_expected, Q_targets)
+                # 計算損失
+                loss = MSE(Q_expected, Q_targets) / accumulation_steps  # 平均損失，避免縮放比例失衡
 
-        # 反向傳播與參數更新
-        total_loss += loss.item()
-        print(total_loss)
-        scaler.scale(loss).backward()  # 使用比例縮放進行反向傳播
+            # 累積反向傳播
+            scaler.scale(loss).backward()  # 累積梯度
+
+            # 更新損失總和
+            total_loss += loss.item() * accumulation_steps
+
+        # 梯度累積完成，進行參數更新
         scaler.step(optimizer)  # 更新模型參數
         scaler.update()  # 更新縮放器
+
+        # 輸出記憶體使用情況
+
+
+        del states, actions, rewards, next_states, dones, Q_expected, Q_targets
+        torch.cuda.empty_cache()
+        gc.collect()
 
         # 更新目標網路參數（定期同步）
         update_count += 1
         if update_count % TARGET_UPDATE_FREQUENCY == 0:
             target_model.load_state_dict(model.state_dict())
-
+    
     return total_loss, update_count
 
 
@@ -184,7 +206,7 @@ num_episodes = 60000
 num_updates = 1
 print_every = 10
 games_in_episode = 30
-batch_size = 3
+batch_size = 4
 
 
 def train():
@@ -196,17 +218,15 @@ def train():
     for i_episode in range(1, num_episodes + 1):
         # 初始化環境
         env.reset()  # 假設 `HollowKnightEnv` 提供 reset 方法
-        score = run_episode(games_in_episode)  # 運行一個回合
-        time.sleep(5)
-        print(score)
+        run_episode(games_in_episode)  # 運行一個回合
         # scores_deque.append(score)  # 添加本次回合分數
         # scores_array.append(score)  # 保存分數
         # avg_score = np.mean(scores_deque)  # 計算最近100回合的平均分
         # avg_scores_array.append(avg_score)  # 保存平均分數
-
         # # 更新 Q 網絡
         total_loss = learn(num_updates, batch_size,target_model,TARGET_UPDATE_FREQUENCY)
-
+        time.sleep(2)
+        frame_buffer.running=True
         # # 打印訓練進度
         # if i_episode % print_every == 0:
         #     elapsed_time = int(time.time() - time_start)
