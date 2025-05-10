@@ -6,7 +6,7 @@ import torch
 from Tool import screngrap
 
 class FrameBuffer(threading.Thread):
-    def __init__(self, windows_name, buffer_size=4, capture_interval=0.2):
+    def __init__(self, windows_name, buffer_size=4, capture_interval=0.1):
         super(FrameBuffer, self).__init__()
         self.windows_name = windows_name
         self.buffer_size = buffer_size
@@ -19,8 +19,9 @@ class FrameBuffer(threading.Thread):
         # state = torch.tensor(frame, dtype=torch.float32) / 255.0 # 歸一化
         # state = state.unsqueeze(0)  # 添加批次維度
 
-        state = torch.tensor(frame, dtype=torch.float32) / 255.0  # 歸一化
+        state = torch.tensor(frame, dtype=torch.float32)   # 歸一化
         state = state.unsqueeze(0)  # 添加批次維度
+        state = state.unsqueeze(0) 
         # return state
         return state
 
@@ -53,6 +54,7 @@ class FrameBuffer(threading.Thread):
 
         if len(self.buffer) < self.buffer_size:
             return None  # 不足 4 幀時返回 None
+        # permute(3, 0, 1, 2)
         stacked_frames = torch.cat(list(self.buffer), dim=0)
-        stacked_frames = stacked_frames.permute(3, 0, 1, 2).unsqueeze(0)  
+        stacked_frames = stacked_frames.permute(1,0,2,3).unsqueeze(0)  
         return stacked_frames

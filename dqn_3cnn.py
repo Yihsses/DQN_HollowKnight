@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class QNetwork3D(nn.Module):
-    def __init__(self, num_actions, time_steps=4, image_channels=4, height=84, width=84):
+    def __init__(self, num_actions, time_steps=5, image_channels=4, height=84, width=84):
         """
         3D CNN Q-Network
         Args:
@@ -21,15 +21,15 @@ class QNetwork3D(nn.Module):
         self.height = height
         self.width = width
         
-        # 3D 卷積層處理時間-空間特徵
-        self.conv1 = nn.Conv3d(image_channels, 32, kernel_size=(3, 3, 3), stride=1, padding=1)
-        self.conv2 = nn.Conv3d(32, 64, kernel_size=(3, 3, 3), stride=1, padding=1)
-        self.pool = nn.MaxPool3d(kernel_size=(2, 2, 2), stride=(2, 2, 2))
+        # 3D 卷積層處理時間-空間特徵，利用 stride 和額外卷積層
+        self.conv1 = nn.Conv3d(image_channels, 32, kernel_size=(3, 3, 3), stride=(2, 2, 2), padding=1)
+        self.conv2 = nn.Conv3d(32, 64, kernel_size=(3, 3, 3), stride=(2, 2, 2), padding=1)
+        self.conv3 = nn.Conv3d(64, 128, kernel_size=(3, 3, 3), stride=(2, 2, 2), padding=1)
+        self.conv4 = nn.Conv3d(128, 128, kernel_size=(3, 3, 3), stride=1, padding=1)
 
-        # 計算展平後的大小
-        
         # 全連接層
-        self.fc1 = nn.Linear(64*height*width, 128)
+        flattened_size = (height // 8) * (width // 8) * (time_steps // 8) * 128  # 根據 stride 計算展平後的大小
+        self.fc1 = nn.Linear(flattened_size, 128)
         self.fc2 = nn.Linear(128, 64)
         self.fc3 = nn.Linear(64, 32)
         self.fc4 = nn.Linear(32, num_actions)
@@ -40,12 +40,15 @@ class QNetwork3D(nn.Module):
 
     def init_weights(self):
         """
-        初始化全連接層的權重。
+        初始化全連接層和卷積層的權重。
         """
+        # Xavier 初始化適用於全連接層
         nn.init.xavier_uniform_(self.fc1.weight)
         nn.init.xavier_uniform_(self.fc2.weight)
         nn.init.xavier_uniform_(self.fc3.weight)
         nn.init.xavier_uniform_(self.fc4.weight)
+
+
 
 
     def forward(self, x):
@@ -57,10 +60,9 @@ class QNetwork3D(nn.Module):
             torch.Tensor: Q 值，形狀為 (batch_size, num_actions)。
         """
         x = F.relu(self.conv1(x))
-        x = self.pool(x)
         x = F.relu(self.conv2(x))
-        x = self.pool(x)
-
+        x = F.relu(self.conv3(x))  # 額外的卷積層
+        x = F.relu(self.conv4(x)) 
         # 展平特徵向量
         batch_size = x.size(0)
         x = x.view(batch_size, -1)

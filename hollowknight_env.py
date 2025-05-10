@@ -34,17 +34,17 @@ class HollowKnightEnv:
         執行動作，計算下一狀態、獎勵和是否結束
         """
         # 執行動作
-        # take_action(action)
-        action_thread = TackAction(threadID=1, name="ActionThread", direction=None, action=action)  # 0 代表 Attack
-        action_thread.start()
-        time.sleep(0.02)  # 動作延遲 (根據需要調整)
+        take_action(action)
+        # action_thread = TackAction(threadID=1, name="ActionThread", direction=None, action=action)  # 0 代表 Attack
+        # action_thread.start()
+        # time.sleep(0.45)  # 動作延遲 (根據需要調整)
 
         # 更新狀態
         # self.previous_state = self.state
         # self.state = self.get_current_state()
         
         # 計算獎勵
-        reward = self.calculate_reward(action)
+        reward,previous_HP_reward = self.calculate_reward(action)
         self.health = self.get_health()
         self.boss_health = self.get_boss_health()
         # 更新是否結束
@@ -53,29 +53,28 @@ class HollowKnightEnv:
         # 遞增步數
         self.step_count += 1
 
-        return reward, self.done
+        return reward,previous_HP_reward, self.done
 
     def calculate_reward(self,action):
         """
         計算獎勵
         """
-        reward = 0
+        reward =  0
+        previous_HP_reward = 0 
         # 示例：根據健康值變化計算獎勵
         health_diff = self.get_health() - self.health
         boss_health_diff = self.get_boss_health() - self.boss_health
-
+# 6
         if health_diff < 0:
-            reward -= 60  # 損失健康值，給負獎勵
+            previous_HP_reward = -1 # 損失健康值，給負獎勵
             print("扣血")
-        
-        if(boss_health_diff < 0 and action == 0 ):
+
+        if(boss_health_diff < 0 and (action == 0 or action == 1) ):
             print("攻擊成功")
-            reward += 20
-        if( boss_health_diff >= 0 and action == 0):
-            reward -= 10
+            reward = 1
         # 示例：根據分數增長計算獎勵
         # 更新當前健康值和分數
-        return reward
+        return reward,previous_HP_reward
 
     def check_done(self):
         """
@@ -102,12 +101,10 @@ class HollowKnightEnv:
         for i in range(6,boss_hp[16].shape[0]):
             if(boss_hp[20][i][2] >= 234):
                 now_hp+=1
-        if(now_hp <= 0 and  self.first_attacked):
-            now_hp = 0
-        elif( self.first_attacked == False and now_hp == 0 ):
-            now_hp = self.boss_health
-        if(now_hp == 622):
+        if(now_hp >= 600 and now_hp < 636):
             self.first_attacked = True
+        if(self.first_attacked == False):
+            now_hp = 636
         # print(now_hp)
         return now_hp
     def get_health(self):

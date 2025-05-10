@@ -62,7 +62,15 @@ def Move_Right():
     time.sleep(0.3)
     sendkey.ReleaseKey(D)
 
-def Attack():
+def Right_Attack():
+    Turn_Right()
+    sendkey.PressKey(J)
+    time.sleep(0.15)
+    sendkey.ReleaseKey(J)
+    Nothing()
+    time.sleep(0.01)
+def Left_Attack():
+    Turn_Left()
     sendkey.PressKey(J)
     time.sleep(0.15)
     sendkey.ReleaseKey(J)
@@ -90,7 +98,20 @@ def Mid_Jump():
     time.sleep(0.4)
     sendkey.ReleaseKey(Space)
     Nothing()
-
+def left_dash():
+    Turn_Left()
+    sendkey.PressKey(K)
+    time.sleep(0.4)
+    sendkey.ReleaseKey(K)
+    Nothing()
+    time.sleep(0.01)
+def right_dash():
+    Turn_Right
+    sendkey.PressKey(K)
+    time.sleep(0.4)
+    sendkey.ReleaseKey(K)
+    Nothing()
+    time.sleep(0.01)  
 def restart():
     sendkey.PressKey(Space)
     sendkey.ReleaseKey(Space)
@@ -186,7 +207,9 @@ def restart():
 
 
 # List for action functions
-Actions = [Attack,Short_Jump, Mid_Jump ,Move_Left, Move_Right, Turn_Left, Turn_Right]
+Actions = [Right_Attack,Left_Attack,Short_Jump, Mid_Jump ,Move_Left, Move_Right]
+# Turn_Left, Turn_Right,
+# Right_Attack,Left_Attack
 # Directions = [Move_Left, Move_Right, Turn_Left, Turn_Right]
 # Run the action
 def take_action(action):

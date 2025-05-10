@@ -3,6 +3,9 @@ import torch.nn as nn
 import gc
 import numpy as np
 import random
+
+import torch.optim.nadam
+from Q_3d_resnet import ResNet3D
 from dqnnet import Q_construct
 from dqn_3cnn import Q_construct_3d
 # from dqnnet import QNetwork
@@ -14,39 +17,46 @@ import matplotlib.pyplot as plt
 from replay_buff import ReplayMemory
 from Tool import framebuffer
 from hollowknight_env import HollowKnightEnv
+from dqn_net import SimpleQ
 import torch.cuda.amp as amp
-
+action_num = 6
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
-model =  Q_construct_3d( height=400//4, width=200//4, num_actions=6,image_channels=3).to(device)
-target_model =  Q_construct_3d( height=400//4, width=200//4, num_actions=6,image_channels=3).to(device)
+# model =  ResNet3D( height=200, width=400, num_actions=action_num,image_channels=1).to(device)
+# target_model =  ResNet3D( height=200, width=400, num_actions=action_num,image_channels=1).to(device)
 # model =  Q_construct(input_dim=int((400/4)*(200/4)), num_actions=6,image_channels=12).to(device)
 # target_model =Q_construct(input_dim=int((400/4)*(200/4)), num_actions=6,image_channels=12).to(device)
-# model =  Q_construct_3d(height=1280 // 4, width=720 // 4, num_actions=6, image_channels=1).to(device)
-# target_model = Q_construct_3d(height=1280 // 4, width=720 // 4, num_actions=6, image_channels=1).to(device)
-
+model =  Q_construct_3d(height=400, width=200,time_steps=8, num_actions=6, image_channels=1).to(device)
+target_model = Q_construct_3d(height=400, width=200, time_steps=8, num_actions=6, image_channels=1).to(device)
 update_count = 0
 
-frame_buffer = framebuffer.FrameBuffer(windows_name="HOLLOW KNIGHT", buffer_size=4, capture_interval=0.02)
-epsilon =300
-epsilon_min = 0.1  # 最小探索機率
-epsilon_decay = 0.995  
-gridsize = 15
-GAMMA = 0.9
-TARGET_UPDATE_FREQUENCY = 200
-optimizer = torch.optim.Adam(model.parameters(), lr = 0.0001)
 
-memory = ReplayMemory(300)
+epsilon =1
+epsilon_min = 0.1  # 最小探索機率
+epsilon_decay = 0.995
+gridsize = 15
+GAMMA = 0.995
+TARGET_UPDATE_FREQUENCY = 5000
+NETWORK_UPDATE_FREQUENCY = 1
+MODEL_SAVE_FREQUENCY = 10000
+
+optimizer = torch.optim.NAdam(model.parameters(), lr = 0.0001)
+
+memory = ReplayMemory(1000)
 env = HollowKnightEnv()
-frame_buffer.start()
+
 def run_episode(num_games):
+    frame_buffer = framebuffer.FrameBuffer(windows_name="HOLLOW KNIGHT", buffer_size=8, capture_interval=0.05)
+    frame_buffer.start()
     run = True
     move = 0
     games_played = 0
     total_reward = 0
     episode_games = 0
     len_array = []
-    
+    delay_reward = []
+    time.sleep(0.5)
+    model.eval()
     while run:
         frames = frame_buffer.get_latest_3d_frames()
         # state = screngrap.screngrap.grap('HOLLOW KNIGHT')ㄇ
@@ -55,23 +65,33 @@ def run_episode(num_games):
         # state = state.unsqueeze(0)
         # action_0 = model.forward(state)
         # rand = np.random.uniform(0, 1)
-        rand = np.random.uniform(0, 250)  # 隨機生成一個 0 到 250 之間的數字
+        rand = np.random.uniform(0, 1)  # 隨機生成一個 0 到 250 之間的數字
         action = 0
         global epsilon 
+        if(frames == None):
+            continue
         if rand > epsilon and frames != None:
-            if(frames.shape[2] == 4):
+            if(frames.shape[2] == 6):
                 # frames = frames.permute(1, 0, 2, 3).unsqueeze(0)
-                action = torch.argmax(model(frames.to(device)), dim=1).item()
+                with torch.no_grad():
+                    action = torch.argmax(model(frames.to(device)), dim=1).item()
                 print("模型" + str(action))
         else:
             # frames = frames.permute(1, 0, 2, 3).unsqueeze(0)
-            action = np.random.randint(0, 6)
-            time.sleep(0.1)
-            # print("隨機：" + str(action))
+            action = np.random.randint(0,action_num)
+            print("隨機：" + str(action))
         now_state =  frames
-        reward , done = env.step(action)
-        
-        frames = frame_buffer.get_latest_3d_frames()
+        reward ,previous_HP_reward,done = env.step(action)
+        frames = frame_buffer.get_latest_3d_frames() 
+        if(previous_HP_reward != 0 ):
+            for i in range(0,3):
+                print(previous_HP_reward)
+                index_to_modify = len(memory) - 1 -i
+                old_experience = memory.buffer[index_to_modify]
+                # 創建一個新的 tuple，替換第 3 個元素
+                new_experience = (old_experience[0], old_experience[1], old_experience[2] +  previous_HP_reward, old_experience[3], old_experience[4])
+                # 替換 buffer 中的舊資料
+                memory.buffer[index_to_modify] = new_experience
         next_state = frames
         env.previous_state = now_state
         env.state = next_state
@@ -80,7 +100,7 @@ def run_episode(num_games):
         total_reward += reward
 
         episode_games += 1
-        epsilon = max(epsilon_min, epsilon * epsilon_decay)  # 確保 epsilon 不小於 epsilon_min
+        # 確保 epsilon 不小於 epsilon_min
         if done == True:
             run = False 
             # len_array.append(len_of_snake)
@@ -103,10 +123,10 @@ import psutil
 import torch.amp as amp  # 使用 torch.amp 而非 torch.cuda.amp
 import psutil
 
-def learn_td(num_updates, batch_size, target_model, TARGET_UPDATE_FREQUENCY, accumulation_steps=4):
+def learn_td(num_updates, batch_size, target_model, TARGET_UPDATE_FREQUENCY, accumulation_steps=8):
     total_loss = 0
-
-
+    model.train()
+    target_model.eval()
     for update in range(num_updates):
         optimizer.zero_grad()  # 在每個梯度累加周期的起點清零
         for step in range(accumulation_steps):
@@ -123,7 +143,8 @@ def learn_td(num_updates, batch_size, target_model, TARGET_UPDATE_FREQUENCY, acc
 
             # 計算當前 Q 值和下一狀態的 Q 值
             q_local = model.forward(states)
-            next_q_value = target_model.forward(next_states)
+            with torch.no_grad():
+                next_q_value = target_model.forward(next_states)
 
             # 選擇當前動作的 Q 值
             Q_expected = q_local.gather(1, actions.unsqueeze(1)).squeeze(1)
@@ -157,50 +178,63 @@ def learn_td(num_updates, batch_size, target_model, TARGET_UPDATE_FREQUENCY, acc
         if update_count % TARGET_UPDATE_FREQUENCY == 0:
             target_model.load_state_dict(model.state_dict())
             print("更新網路")
+        if update_count % MODEL_SAVE_FREQUENCY == 0 :
+            torch.save(model.state_dict(), f'./DQN_HollowKnight/save/HollowKnight_{update_count}.pth')
+            print("模型儲存")
 
     return total_loss
 
-# def learn(num_updates, batch_size):
-#     total_loss = 0
+def learn(num_updates, batch_size, target_model, TARGET_UPDATE_FREQUENCY):
+    total_loss = 0
+    model.train()
+    target_model.eval()
+    for i in range(num_updates):
 
-#     for i in range(num_updates):
-#         optimizer.zero_grad()
-#         sample = memory.sample(batch_size)
+        optimizer.zero_grad()
+        sample = memory.sample(batch_size)
+        states, actions, rewards, next_states, dones = sample
+        states = torch.cat([x for x in states], dim=0).to(device)
+        actions = torch.LongTensor(actions).to(device)
+        rewards = torch.FloatTensor(rewards).to(device)
+        next_states = torch.cat([x for x in next_states], dim=0).to(device)
+        dones = torch.FloatTensor(dones).to(device)
 
-#         states, actions, rewards, next_states, dones = sample
-#         states = torch.cat([x.unsqueeze(0) for x in states], dim=0)
-#         actions = torch.LongTensor(actions)
-#         rewards = torch.FloatTensor(rewards)
-#         next_states = torch.cat([x.unsqueeze(0) for x in next_states])
-#         dones = torch.FloatTensor(dones)
+        q_local = model.forward(states)
+        with torch.no_grad():
+            next_q_value = target_model.forward(next_states)
 
-#         q_local = model.forward(states)
-#         next_q_value = model.forward(next_states)
+        Q_expected = q_local.gather(1, actions.unsqueeze(0).transpose(0, 1)).transpose(0, 1).squeeze(0)
 
-#         Q_expected = q_local.gather(1, actions.unsqueeze(0).transpose(0, 1)).transpose(0, 1).squeeze(0)
+        Q_targets_next = torch.max(next_q_value, dim=1)[0] * (torch.ones_like(dones) - dones)
 
-#         Q_targets_next = torch.max(next_q_value, 1)[0] * (torch.ones(dones.size()) - dones)
+        Q_targets = rewards + GAMMA * Q_targets_next
 
-#         Q_targets = rewards + GAMMA * Q_targets_next
+        loss = MSE(Q_expected, Q_targets)
 
-#         loss = MSE(Q_expected, Q_targets)
+        total_loss += loss
 
-#         total_loss += loss
-#         loss.backward()
-#         optimizer.step()
-
-#     return total_loss
+        loss.backward()
+        optimizer.step()
+        global update_count 
+        update_count += 1
+        print("更新網路：" + str(update_count))
+        if update_count % TARGET_UPDATE_FREQUENCY == 0:
+            target_model.load_state_dict(model.state_dict())
+            print("更新網路")
+        if update_count % MODEL_SAVE_FREQUENCY == 0 :
+            torch.save(model.state_dict(), f'./DQN_HollowKnight/save/HollowKnight_{update_count}.pth')
+            print("模型儲存")
+    return total_loss
 
 
 num_episodes = 60000
-num_updates = 10
+num_updates =500
 print_every = 10
 games_in_episode = 30
 batch_size =16
 
 
 def train():
-    scores_deque = deque(maxlen=100)  # 保存最近 100 個回合的分數
     scores_array = []  # 保存每一回合的分數
     avg_scores_array = []  # 保存平均分數
     time_start = time.time()  # 記錄開始時間
@@ -216,10 +250,14 @@ def train():
         # avg_score = np.mean(scores_deque)  # 計算最近100回合的平均分
         # avg_scores_array.append(avg_score)  # 保存平均分數
         # # 更新 Q 網絡
-        total_loss = learn_td(num_updates, batch_size,target_model,TARGET_UPDATE_FREQUENCY)
-        print(total_loss)
-        time.sleep(5)
-        frame_buffer.running=True
+        if(i_episode % NETWORK_UPDATE_FREQUENCY ==0):
+            total_loss = learn(num_updates, batch_size,target_model,TARGET_UPDATE_FREQUENCY)
+            print(total_loss)
+            time.sleep(5)
+            global epsilon
+            epsilon = max(epsilon_min, epsilon * epsilon_decay) 
+        else:
+            time.sleep(7)
         # # 打印訓練進度
         # if i_episode % print_every == 0:
         #     elapsed_time = int(time.time() - time_start)

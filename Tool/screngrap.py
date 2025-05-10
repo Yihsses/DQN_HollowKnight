@@ -6,6 +6,7 @@ import win32con
 import time
 import cv2
 import tensorflow as tf
+
 class screngrap():
 
     def grap(Windowsname):
@@ -13,10 +14,10 @@ class screngrap():
 
         # 獲取視窗尺寸
         left, top, right, bot = win32gui.GetWindowRect(hwnd_target)
-        top += 32+80
+        top += 32+360
         left += 10
         w = right - left-7
-        h = bot - top-7-40
+        h = bot - top-7-70
 
         # 設置前景窗口，等待穩定
         try:
@@ -44,7 +45,7 @@ class screngrap():
                 bmpstr = saveBitMap.GetBitmapBits(True)
                 img = np.frombuffer(bmpstr, dtype='uint8')
                 img.shape = (h, w, 4)
-                img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+                img = cv2.cvtColor(img, cv2.COLOR_BGRA2GRAY)
                 # 清理資源
                 win32gui.DeleteObject(saveBitMap.GetHandle())
                 saveDC.DeleteDC()
@@ -67,6 +68,7 @@ class screngrap():
                 return resized_img
             except:
                 print("error")
+                
     def grap_hp(Windowsname):
         """
         截取指定視窗內的一部分 (假設為 HP 區域) 並保存為圖片，無需調整大小。
@@ -119,7 +121,7 @@ class screngrap():
 
                 # 保存圖片
                 pil_img = Image.fromarray(img)
-                # pil_img.save("hp.png")
+
                 # print("HP 圖片已保存為 'hp.png'")
                 resized_img_np = np.array(pil_img)
                 return np.array(resized_img_np)
