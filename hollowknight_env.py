@@ -4,9 +4,13 @@ from Tool.action import restart
 from Tool.action import  take_action
 from Tool.action import TackAction
 from Tool.screngrap import screngrap
+from ultralytics import YOLO
+model = YOLO("./DQN_HollowKnight/YOLO/best.pt")
+# 載入模型
 class HollowKnightEnv:
     def __init__(self):
         # 初始化環境屬性
+        
         self.state = None  # 當前狀態 (例如：圖像或遊戲數據)
         self.previous_state = None  # 前一狀態，用於計算差異
         self.done = False  # 是否結束
@@ -15,11 +19,13 @@ class HollowKnightEnv:
         self.step_count = 0  # 當前步數
         self.boss_health = 636
         self.first_attacked = False 
+        self.attack_fail = 0 
     def reset(self):
         """
         重置環境到初始狀態
         """
         restart()
+        self.attack_fail = 0
         self.first_attacked = False 
         self.state = self.get_current_state()  # 獲取遊戲初始狀態
         self.previous_state = self.state
@@ -34,10 +40,10 @@ class HollowKnightEnv:
         執行動作，計算下一狀態、獎勵和是否結束
         """
         # 執行動作
-        take_action(action)
-        # action_thread = TackAction(threadID=1, name="ActionThread", direction=None, action=action)  # 0 代表 Attack
-        # action_thread.start()
-        # time.sleep(0.45)  # 動作延遲 (根據需要調整)
+        # take_action(action)
+        action_thread = TackAction(threadID=1, name="ActionThread", direction=None, action=action)  # 0 代表 Attack
+        action_thread.start()
+        time.sleep(0.25)  # 動作延遲 (根據需要調整)
 
         # 更新狀態
         # self.previous_state = self.state
@@ -64,18 +70,51 @@ class HollowKnightEnv:
         # 示例：根據健康值變化計算獎勵
         health_diff = self.get_health() - self.health
         boss_health_diff = self.get_boss_health() - self.boss_health
-# 6
+# 6      
+        boss_hero_pos = self.get_position()
+        if(boss_hero_pos != "fail"):
+            if(boss_hero_pos == "left"):
+                if(action // 3 == 1) : 
+                    print("移動方向正確")
+                    reward += 0.5
+                else :
+                    reward -= 0.5
+            elif(boss_hero_pos == "right"):
+                if(action // 3 == 2) : 
+                    print("移動方向正確")
+                    reward +=0.5
+                else:
+                    reward -= 0.5
         if health_diff < 0:
             previous_HP_reward = -1 # 損失健康值，給負獎勵
             print("扣血")
-
-        if(boss_health_diff < 0 and (action == 0 or action == 1) ):
+        if(boss_health_diff < 0 and health_diff >= 0 ):
             print("攻擊成功")
-            reward = 1
+            reward += 1
+            self.attack_fail = 0 
+        # if(previous_HP_reward == 0 and reward == 0 ) : reward = -0.08
         # 示例：根據分數增長計算獎勵
         # 更新當前健康值和分數
         return reward,previous_HP_reward
+    def get_position(self):
+        boss_left = 0 
+        hero_left = 0
 
+        results = model.predict(source=screngrap.grap("Hollow Knight",img2_return = True), conf=0.4, device=0) 
+        if(len(results[0].boxes.cls) != 2): return "Fail"
+        if(len(results[0].boxes.cls) == 2):
+            if((results[0].boxes[0].cls.item() == 0 and results[0].boxes[1].cls.item() == 1) or (results[0].boxes[0].cls.item() == 1 and results[0].boxes[1].cls.item() == 0)):
+                for i in range(0,2):
+                    if(results[0].boxes[i].cls.item() == 0):
+                        boss_left = results[0].boxes[i].xyxy[0][0] 
+                    elif(results[0].boxes[i].cls.item() == 1):
+                        hero_left = results[0].boxes[i].xyxy[0][0]
+        print("BOSS : {}".format(boss_left))
+        print("HERO : {}".format(hero_left))
+        if(boss_left < hero_left) : 
+            return "left"
+        else :
+            return "right"
     def check_done(self):
         """
         判斷遊戲是否結束

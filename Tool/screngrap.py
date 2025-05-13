@@ -8,13 +8,12 @@ import cv2
 import tensorflow as tf
 
 class screngrap():
-
-    def grap(Windowsname):
+    def grap(Windowsname,number = 0,img2_return = False):
         hwnd_target = win32gui.FindWindow(None, Windowsname)  # 獲取視窗句柄
 
         # 獲取視窗尺寸
         left, top, right, bot = win32gui.GetWindowRect(hwnd_target)
-        top += 32+360
+        top += 32+180
         left += 10
         w = right - left-7
         h = bot - top-7-70
@@ -43,8 +42,11 @@ class screngrap():
                 # 將位圖轉換為 NumPy 陣列
                 bmpinfo = saveBitMap.GetInfo()
                 bmpstr = saveBitMap.GetBitmapBits(True)
+                
                 img = np.frombuffer(bmpstr, dtype='uint8')
                 img.shape = (h, w, 4)
+                img2 =  cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+                
                 img = cv2.cvtColor(img, cv2.COLOR_BGRA2GRAY)
                 # 清理資源
                 win32gui.DeleteObject(saveBitMap.GetHandle())
@@ -52,8 +54,12 @@ class screngrap():
                 mfcDC.DeleteDC()
                 win32gui.ReleaseDC(hdesktop, hwndDC)
 
-                resized_img = cv2.resize(img, (400, 200))
-                cv2.imwrite("ok_resized.png", resized_img)
+                if(img2_return):return Image.fromarray(img2)
+                pil_img = Image.fromarray(img2)
+                # pil_img.save(".\YOLO DATA\{}".format("Hollow Knight_" + str(number) + ".png"))
+                # pil_img.save("YOLO.png")
+                resized_img = cv2.resize(img, (160, 160))
+                # cv2.imwrite(".\ELDING BOT\YOLO DATA\{}".format("Hollow Knight_" + str(number)) , resized_img)
                 resized_img = np.array(resized_img)
                 # pil_img = Image.fromarray(img)
                 # pil_img = pil_img.convert('L') 

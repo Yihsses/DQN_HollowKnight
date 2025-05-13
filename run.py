@@ -16,37 +16,45 @@ import time
 import matplotlib.pyplot as plt
 from replay_buff import ReplayMemory
 from Tool import framebuffer
-from hollowknight_env import HollowKnightEnv
+from hollowknight_env import HollowKnightEnv 
 from dqn_net import SimpleQ
 import torch.cuda.amp as amp
-action_num = 6
+action_num = 9
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
-# model =  ResNet3D( height=200, width=400, num_actions=action_num,image_channels=1).to(device)
-# target_model =  ResNet3D( height=200, width=400, num_actions=action_num,image_channels=1).to(device)
+model =  ResNet3D( height=200, width=400, num_actions=action_num,image_channels=1).to(device)
+target_model =  ResNet3D( height=200, width=400, num_actions=action_num,image_channels=1).to(device)
+
 # model =  Q_construct(input_dim=int((400/4)*(200/4)), num_actions=6,image_channels=12).to(device)
 # target_model =Q_construct(input_dim=int((400/4)*(200/4)), num_actions=6,image_channels=12).to(device)
-model =  Q_construct_3d(height=400, width=200,time_steps=8, num_actions=6, image_channels=1).to(device)
-target_model = Q_construct_3d(height=400, width=200, time_steps=8, num_actions=6, image_channels=1).to(device)
+# model =  Q_construct_3d(height=400, width=200,time_steps=8, num_actions=1, image_channels=1).to(device)
+# target_model = Q_construct_3d(height=400, width=200, time_steps=8, num_actions=1, image_channels=1).to(device)
+
+# model =  Q_construct_3d(height=400, width=200,time_steps=8, num_actions=6, image_channels=1).to(device)
+# target_model  = Q_construct_3d(height=400, width=200, time_steps=8, num_actions=6, image_channels=1).to(device)
+
 update_count = 0
 
+# model.load_state_dict(torch.load(".\DQN_HollowKnight\save\HollowKnight_10000.pth"))
+# target_model.load_state_dict(torch.load(".\DQN_HollowKnight\save\HollowKnight_10000.pth"))
 
 epsilon =1
-epsilon_min = 0.1  # 最小探索機率
-epsilon_decay = 0.995
+epsilon_min = 0.1 # 最小探索機率
+epsilon_decay = 0.98
 gridsize = 15
-GAMMA = 0.995
+GAMMA = 0.99
 TARGET_UPDATE_FREQUENCY = 5000
 NETWORK_UPDATE_FREQUENCY = 1
 MODEL_SAVE_FREQUENCY = 10000
 
 optimizer = torch.optim.NAdam(model.parameters(), lr = 0.0001)
 
-memory = ReplayMemory(1000)
+memory = ReplayMemory(600)
 env = HollowKnightEnv()
 
 def run_episode(num_games):
-    frame_buffer = framebuffer.FrameBuffer(windows_name="HOLLOW KNIGHT", buffer_size=8, capture_interval=0.05)
+    frame_buffer = framebuffer.FrameBuffer(windows_name="HOLLOW KNIGHT", buffer_size=8, capture_interval=0.02)
     frame_buffer.start()
     run = True
     move = 0
@@ -69,13 +77,13 @@ def run_episode(num_games):
         action = 0
         global epsilon 
         if(frames == None):
-            continue
+            continue 
         if rand > epsilon and frames != None:
-            if(frames.shape[2] == 6):
+            if(frames.shape[2] == 8):
                 # frames = frames.permute(1, 0, 2, 3).unsqueeze(0)
                 with torch.no_grad():
                     action = torch.argmax(model(frames.to(device)), dim=1).item()
-                print("模型" + str(action))
+                print ("模型" + str(action))
         else:
             # frames = frames.permute(1, 0, 2, 3).unsqueeze(0)
             action = np.random.randint(0,action_num)
@@ -83,20 +91,29 @@ def run_episode(num_games):
         now_state =  frames
         reward ,previous_HP_reward,done = env.step(action)
         frames = frame_buffer.get_latest_3d_frames() 
-        if(previous_HP_reward != 0 ):
-            for i in range(0,3):
-                print(previous_HP_reward)
-                index_to_modify = len(memory) - 1 -i
-                old_experience = memory.buffer[index_to_modify]
-                # 創建一個新的 tuple，替換第 3 個元素
-                new_experience = (old_experience[0], old_experience[1], old_experience[2] +  previous_HP_reward, old_experience[3], old_experience[4])
-                # 替換 buffer 中的舊資料
-                memory.buffer[index_to_modify] = new_experience
         next_state = frames
         env.previous_state = now_state
         env.state = next_state
         memory.push(env.previous_state, action, reward, env.state , done)
-        memory.truncate()
+        if(previous_HP_reward != 0 ):
+            for i in range(0,4):
+                index_to_modify = len(memory) - 2 -i
+                old_experience = memory.buffer[index_to_modify]
+                # 創建一個新的 tuple，替換第 3 個元素
+                new_experience = (old_experience[0], old_experience[1],  previous_HP_reward, old_experience[3], old_experience[4])
+                # 替換 buffer 中的舊資料
+                memory.buffer[index_to_modify] = new_experience
+        if(reward >= 1 and len(memory) >= 4 ):
+            for i in range(0,4):
+                index_to_modify = len(memory) - 2 -i
+                old_experience = memory.buffer[index_to_modify]
+                if(old_experience[1] // 3 != 0):
+                    if(old_experience[2] > -1 and old_experience[1] // 3 == action // 3 and action % 3 == 0):
+                    # 創建一個新的 tuple，替換第 3 個元素
+                        new_experience = (old_experience[0], old_experience[1], old_experience[2] +  0.5, old_experience[3], old_experience[4])
+                        # 替換 buffer 中的舊資料
+                        memory.buffer[index_to_modify] = new_experience
+        # memory.truncate()
         total_reward += reward
 
         episode_games += 1

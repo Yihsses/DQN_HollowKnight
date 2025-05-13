@@ -1,4 +1,10 @@
-from Tool import sendkey
-
-sendkey.PressKey(0x20)
-sendkey.ReleaseKey(0x20)
+import time
+from Tool.screngrap import screngrap
+s = screngrap
+number = 0
+while True:
+    print("列印成功")
+    time.sleep(0.2)
+    screngrap.grap("Hollow Knight" , number)
+    number += 1
+    
