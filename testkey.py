@@ -1,7 +1,7 @@
 import time
 from Tool.screngrap import screngrap
 s = screngrap
-number = 0
+number = 100
 while True:
     print("列印成功")
     time.sleep(0.2)

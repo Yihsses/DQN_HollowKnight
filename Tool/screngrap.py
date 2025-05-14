@@ -56,7 +56,7 @@ class screngrap():
 
                 if(img2_return):return Image.fromarray(img2)
                 pil_img = Image.fromarray(img2)
-                # pil_img.save(".\YOLO DATA\{}".format("Hollow Knight_" + str(number) + ".png"))
+                pil_img.save(".\YOLO DATA\{}".format("Hollow Knight_" + str(number) + ".png"))
                 # pil_img.save("YOLO.png")
                 resized_img = cv2.resize(img, (160, 160))
                 # cv2.imwrite(".\ELDING BOT\YOLO DATA\{}".format("Hollow Knight_" + str(number)) , resized_img)
