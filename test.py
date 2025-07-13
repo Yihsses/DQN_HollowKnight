@@ -4,6 +4,7 @@ import numpy as np
 from dqn_3cnn import Q_construct_3d
 from Tool import framebuffer
 from Tool import screngrap
+state = screngrap.screngrap.grap('HOLLOW KNIGHT')
 
 # 檢查 GPU
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -16,6 +17,7 @@ frame_buffer.start()
 
 while True:
     frames = frame_buffer.get_latest_frames()
+
     if frames is not None:
         if len(frames) >= 4:
             # 調整維度並移動到 GPU
@@ -27,7 +29,6 @@ while True:
                 print(action_0)
 
 # 抓取單幀並移動到 GPU
-state = screngrap.screngrap.grap('HOLLOW KNIGHT')
 state = torch.tensor(state).permute(2, 0, 1)
 state = torch.tensor(state, dtype=torch.float32) / 255.0
 state = state.unsqueeze(0).to(device)

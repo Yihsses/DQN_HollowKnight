@@ -13,7 +13,7 @@ class screngrap():
 
         # 獲取視窗尺寸
         left, top, right, bot = win32gui.GetWindowRect(hwnd_target)
-        top += 32+180
+        top += 32+60
         left += 10
         w = right - left-7
         h = bot - top-7-70
@@ -56,8 +56,8 @@ class screngrap():
 
                 if(img2_return):return Image.fromarray(img2)
                 pil_img = Image.fromarray(img2)
-                pil_img.save(".\YOLO DATA\{}".format("Hollow Knight_" + str(number) + ".png"))
-                # pil_img.save("YOLO.png")
+                # pil_img.save(".\YOLO DATA\{}".format("Hollow Knight_" + str(number) + ".png"))
+                pil_img.save("YOLO.png")
                 resized_img = cv2.resize(img, (160, 160))
                 # cv2.imwrite(".\ELDING BOT\YOLO DATA\{}".format("Hollow Knight_" + str(number)) , resized_img)
                 resized_img = np.array(resized_img)
@@ -75,120 +75,4 @@ class screngrap():
             except:
                 print("error")
                 
-    def grap_hp(Windowsname):
-        """
-        截取指定視窗內的一部分 (假設為 HP 區域) 並保存為圖片，無需調整大小。
-        
-        :param Windowsname: 要截取的視窗名稱
-        """
-        hwnd_target = win32gui.FindWindow(None, Windowsname)  # 獲取視窗句柄
-
-        if not hwnd_target:
-            raise ValueError(f"找不到名稱為 '{Windowsname}' 的視窗")
-
-        # 獲取視窗尺寸
-        left, top, right, bot = win32gui.GetWindowRect(hwnd_target)
-        top += 80  # 調整區域起點
-        left += 180
-        w = 310  # 寬度
-        h = 50   # 高度
-
-        # 設置前景窗口，等待穩定
-        try:
-            win32gui.SetForegroundWindow(hwnd_target)
-        except Exception as e:
-            print("無法設置前景窗口:", e)
-
-        # 截圖
-        while True :
-            try:
-                hdesktop = win32gui.GetDesktopWindow()
-                hwndDC = win32gui.GetWindowDC(hdesktop)
-                mfcDC = win32ui.CreateDCFromHandle(hwndDC)
-                saveDC = mfcDC.CreateCompatibleDC()
-
-                saveBitMap = win32ui.CreateBitmap()
-                saveBitMap.CreateCompatibleBitmap(mfcDC, w, h)
-                saveDC.SelectObject(saveBitMap)
-
-                saveDC.BitBlt((0, 0), (w, h), mfcDC, (left, top), win32con.SRCCOPY)
-
-                # 將位圖轉換為 NumPy 陣列
-                bmpinfo = saveBitMap.GetInfo()
-                bmpstr = saveBitMap.GetBitmapBits(True)
-                img = np.frombuffer(bmpstr, dtype='uint8')
-                img.shape = (h, w, 4)
-
-                # 清理資源
-                win32gui.DeleteObject(saveBitMap.GetHandle())
-                saveDC.DeleteDC()
-                mfcDC.DeleteDC()
-                win32gui.ReleaseDC(hdesktop, hwndDC)
-
-                # 保存圖片
-                pil_img = Image.fromarray(img)
-
-                # print("HP 圖片已保存為 'hp.png'")
-                resized_img_np = np.array(pil_img)
-                return np.array(resized_img_np)
-            except Exception as e:
-                print(e)
-     
-    def grap_Boss_hp(Windowsname):
-        """
-        截取指定視窗內的一部分 (假設為 HP 區域) 並保存為圖片，無需調整大小。
-        
-        :param Windowsname: 要截取的視窗名稱
-        """
-        hwnd_target = win32gui.FindWindow(None, Windowsname)  # 獲取視窗句柄
-
-        if not hwnd_target:
-            raise ValueError(f"找不到名稱為 '{Windowsname}' 的視窗")
-
-        # 獲取視窗尺寸
-        left, top, right, bot = win32gui.GetWindowRect(hwnd_target)
-        top += 710  # 調整區域起點
-        left += 325
-        w = 800 # 寬度
-        h =30   # 高度
-
-        # 設置前景窗口，等待穩定
-        try:
-            win32gui.SetForegroundWindow(hwnd_target)
-        except Exception as e:
-            print("無法設置前景窗口:", e)
-
-        # 截圖
-        while True:
-            try:
-                hdesktop = win32gui.GetDesktopWindow()
-                hwndDC = win32gui.GetWindowDC(hdesktop)
-                mfcDC = win32ui.CreateDCFromHandle(hwndDC)
-                saveDC = mfcDC.CreateCompatibleDC()
-
-                saveBitMap = win32ui.CreateBitmap()
-                saveBitMap.CreateCompatibleBitmap(mfcDC, w, h)
-                saveDC.SelectObject(saveBitMap)
-
-                saveDC.BitBlt((0, 0), (w, h), mfcDC, (left, top), win32con.SRCCOPY)
-
-                # 將位圖轉換為 NumPy 陣列
-                bmpinfo = saveBitMap.GetInfo()
-                bmpstr = saveBitMap.GetBitmapBits(True)
-                img = np.frombuffer(bmpstr, dtype='uint8')
-                img.shape = (h, w, 4)
-
-                # 清理資源
-                win32gui.DeleteObject(saveBitMap.GetHandle())
-                saveDC.DeleteDC()
-                mfcDC.DeleteDC()
-                win32gui.ReleaseDC(hdesktop, hwndDC)
-
-                # 保存圖片
-                pil_img = Image.fromarray(img)
-                # pil_img.save("hp_boss.png")
-                # print("HP 圖片已保存為 'hp.png'")
-                resized_img_np = np.array(pil_img)
-                return np.array(resized_img_np)
-            except Exception as e:
-                print("無法設置前景窗口:", e)
+   

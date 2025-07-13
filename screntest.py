@@ -22,7 +22,7 @@ model.eval()
 # take_action(2)
 while True:
         frames = frame_buffer.get_latest_3d_frames()
-        # state = screngrap.screngrap.grap('HOLLOW KNIGHT')ㄇ
+        # state = screngrap.screngrap.grap('HOLLOW KNIGHT')
         # state = torch.tensor(state).permute(2, 0, 1)
         # state = torch.tensor(state, dtype=torch.fㄨloat32) / 255.0
         # state = state.unsqueeze(0)

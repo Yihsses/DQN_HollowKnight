@@ -38,8 +38,8 @@ right = 0xCD
 
 esc = 0x01
 
-# move actions
-# 0
+
+
 def Nothing():
     sendkey.ReleaseKey(A)
     sendkey.ReleaseKey(D)
@@ -55,79 +55,80 @@ def Turn_Right():
     sendkey.ReleaseKey(D)
 
 def Move_Left():
+    Nothing()
     sendkey.PressKey(A)
-    time.sleep(0.16)
+    time.sleep(0.01)
 # 1
 def Move_Right():
+    Nothing()
     sendkey.PressKey(D)
-    time.sleep(0.16)
+    time.sleep(0.01)
 
-def Move_long_Left():
-    sendkey.PressKey(A)
-    time.sleep(0.8)
-    sendkey.ReleaseKey(A)
-# 1
-def Move_long_Right():
-    sendkey.PressKey(D)
-    time.sleep(0.6)
-    sendkey.ReleaseKey(D)
 def Attack():
     sendkey.PressKey(J)
-    time.sleep(0.13)
+    time.sleep(0.15)
     sendkey.ReleaseKey(J)
     Nothing()
     time.sleep(0.01)
-def no():
-    pass
-# 1
-# def Attack_Down():
-#     PressKey(DOWN_ARROW)
-#     PressKey(X)
-#     time.sleep(0.05)
-#     ReleaseKey(X)
-#     ReleaseKey(DOWN_ARROW)
-#     time.sleep(0.01)
-# 1
-#JUMP
-# 2
+
+def Attack_Up():
+    # print("Attack up--->")
+    sendkey.PressKey(W)
+    sendkey.PressKey(J)
+    time.sleep(0.11)
+    sendkey.ReleaseKey(W)
+    sendkey.ReleaseKey(J)
+    Nothing()
+    time.sleep(0.01)
 def Short_Jump():
     sendkey.PressKey(Space)
-    time.sleep(0.17) 
-    # Attack()
-    sendkey.ReleaseKey(Space)
-    # Nothing()
+    sendkey.PressKey(S)
+    sendkey.PressKey(J)
+    time.sleep(0.2) 
+    sendkey.ReleaseKey(J)
+    sendkey.ReleaseKey(S)
+    sendkey.PressKey(Space)
+
+    Nothing()
 # 3
 def Mid_Jump():
     sendkey.PressKey(Space)
-    time.sleep(0.4)
-    # Attack()
+    time.sleep(0.2)
+    sendkey.PressKey(J)
+    time.sleep(0.2)
+    sendkey.ReleaseKey(J)
     sendkey.ReleaseKey(Space)
-    # Nothing()
-def left_dash():
-    Turn_Left()
-    sendkey.PressKey(K)
-    time.sleep(0.4)
-    sendkey.ReleaseKey(K)
-    # Nothing()
-    time.sleep(0.01)
-def right_dash():
-    Turn_Right
-    sendkey.PressKey(K)
-    time.sleep(0.4)
-    sendkey.ReleaseKey(K)
     Nothing()
-    time.sleep(0.01)  
+
+def Rush():
+    sendkey.PressKey(K)
+    time.sleep(0.15)
+    sendkey.ReleaseKey(K)
+    time.sleep(0.05)
+
 def restart():
-    sendkey.PressKey(Space)
+    Nothing()
     sendkey.ReleaseKey(Space)
-    time.sleep(4)
-    sendkey.PressKey(W)
-    sendkey.ReleaseKey(W)
-    time.sleep(1)
+    time.sleep(0.3)
     sendkey.PressKey(Space)
+    time.sleep(0.1)
+    sendkey.ReleaseKey(Space)
+    print("按下空白")
+    time.sleep(3)
+    sendkey.PressKey(W)
+    print("W")
+    time.sleep(0.3)
+    sendkey.ReleaseKey(W)
+    time.sleep(2)
+    sendkey.PressKey(Space)
+    print("按下空白")
+
+    time.sleep(0.4)
     sendkey.ReleaseKey(Space)
     time.sleep(3)
     print("成功進入")
+
+
 # Skill
 # 4
 # def Skill():
@@ -163,14 +164,7 @@ def restart():
 
 # # Rush
 # # 6
-# def Rush():
-#     PressKey(L_SHIFT)
-#     time.sleep(0.1)
-#     ReleaseKey(L_SHIFT)
-#     Nothing()
-#     PressKey(X)
-#     time.sleep(0.03)
-#     ReleaseKey(X)
+
 # # Cure
 # def Cure():
 #     PressKey(A)
@@ -212,22 +206,16 @@ def restart():
 
 
 # List for action functions
-Actions = [Attack,Short_Jump, Mid_Jump ,Move_Left, Move_Right]
-# Turn_Left, Turn_Right,
-# Right_Attack,Left_Attack
+Actions = [Attack,Attack_Up,Short_Jump, Mid_Jump,Rush]
+Directions = [Move_Left, Move_Right,Turn_Left, Turn_Right] 
 
-Directions = [no,Move_Left, Move_Right] 
-jump = [no,Mid_Jump]
-# 01 23 45
-# 0123 4567
-# Run the action
+jump = [Nothing,Mid_Jump]
+
 def take_action(action):
-    Actions[0]()
-    Directions[action // 2]()
-    jump[action % 2]()
-# def take_direction(direc): Turn_Left, Turn_Right
-#     Directions[direc]()
+    Actions[action]()
 
+def take_direction(direc):
+    Directions[direc]()
 
 
 class TackAction(threading.Thread):

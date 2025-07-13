@@ -26,9 +26,10 @@ class QNetwork3D(nn.Module):
         self.conv2 = nn.Conv3d(32, 64, kernel_size=(3, 3, 3), stride=(2, 2, 2), padding=1)
         self.conv3 = nn.Conv3d(64, 128, kernel_size=(3, 3, 3), stride=(2, 2, 2), padding=1)
         self.conv4 = nn.Conv3d(128, 128, kernel_size=(3, 3, 3), stride=1, padding=1)
+        self.conv5 = nn.Conv3d(128, 256, kernel_size=(3, 3, 3), stride=1, padding=1)
 
         # 全連接層
-        flattened_size = (height // 8) * (width // 8) * (time_steps // 8) * 128  # 根據 stride 計算展平後的大小
+        flattened_size = (height // 8) * (width // 8) * (time_steps // 8) * 256  # 根據 stride 計算展平後的大小
         self.fc1 = nn.Linear(flattened_size, 128)
         self.fc2 = nn.Linear(128, 64)
         self.fc3 = nn.Linear(64, 32)
