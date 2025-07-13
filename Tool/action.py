@@ -88,8 +88,28 @@ def Short_Jump():
     sendkey.ReleaseKey(J)
     sendkey.ReleaseKey(S)
     sendkey.PressKey(Space)
-
     Nothing()
+def Skill_Up():
+    sendkey.PressKey(W)
+    sendkey.PressKey(F)
+    sendkey.PressKey(J)
+    time.sleep(0.15)
+    sendkey.ReleaseKey(W)
+    sendkey.ReleaseKey(F)
+    sendkey.ReleaseKey(J)
+    Nothing()
+    time.sleep(0.15)
+# 5
+def Skill_Down():
+    sendkey.PressKey(S)
+    sendkey.PressKey(F)
+    sendkey.PressKey(J)
+    time.sleep(0.2)
+    sendkey.ReleaseKey(S)
+    sendkey.ReleaseKey(F)
+    sendkey.ReleaseKey(J)
+    Nothing()
+    time.sleep(0.3)
 # 3
 def Mid_Jump():
     sendkey.PressKey(Space)
@@ -206,7 +226,7 @@ def restart():
 
 
 # List for action functions
-Actions = [Attack,Attack_Up,Short_Jump, Mid_Jump,Rush]
+Actions = [Attack,Attack_Up,Short_Jump, Mid_Jump,Skill_Up,Skill_Down,Rush]
 Directions = [Move_Left, Move_Right,Turn_Left, Turn_Right] 
 
 jump = [Nothing,Mid_Jump]

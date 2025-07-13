@@ -1,6 +1,15 @@
+from torchviz import make_dot
+from Q_3d_resnet import ResNet3D
 import torch
 import torch.nn as nn
 import numpy as np
+model = ResNet3D(num_actions=6)
+dummy_input = torch.randn(1, 1, 4, 160, 160)  # (B, C, T, H, W)
+output = model(dummy_input)
+make_dot(output, params=dict(model.named_parameters())).render("resnet3d", format="png")
+
+
+
 from dqn_3cnn import Q_construct_3d
 from Tool import framebuffer
 from Tool import screngrap

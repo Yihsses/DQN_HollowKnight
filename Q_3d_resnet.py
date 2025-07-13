@@ -32,8 +32,8 @@ class ResNet3D(nn.Module):
         self.bn2 = nn.BatchNorm3d(48)
         self.conv3 =  nn.Conv3d(48, 64, kernel_size=(2, 3, 3), stride=(1, 1, 1))
         self.bn3 = nn.BatchNorm3d(64)
+
         self.relu = nn.ReLU(inplace=True)
-      
         # self.maxpool = nn.MaxPool3d(kernel_size=3, stride=2, padding=1)
 
         self.layer1 = self._make_layer(BasicBlock3D, 64, 64, 2, stride=1)

@@ -21,8 +21,10 @@ from dqn_net import SimpleQ
 import torch.cuda.amp as amp
 import collections
 from Tool.action import restart
+
 move_action_num = 4
-attack_action_num = 5
+attack_action_num = 7
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 model =  ResNet3D( height=200, width=400, num_actions=move_action_num,image_channels=1).to(device)

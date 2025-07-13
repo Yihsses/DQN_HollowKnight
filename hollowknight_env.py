@@ -23,7 +23,7 @@ class HollowKnightEnv:
         self.nowBossX = 0
         self.nowHeroY = 0
         self.nowBossY = 0
-
+        self.mp = 0
         self.state = None  # 當前狀態 (例如：圖像或遊戲數據)
         self.done = False  # 是否結束
         self.score = 0  # 遊戲分數
@@ -38,6 +38,7 @@ class HollowKnightEnv:
         """
         重置環境到初始狀態
         """
+        self.mp = 0
         self.nowhealth = 8
         self.nowBosshealth =900
         self.nowHeroX = 0
@@ -58,9 +59,11 @@ class HollowKnightEnv:
     def step(self, move_action,attack_action,is_random):
         hornet_skill1 = False
         if(is_random):
-            if(self.nowBossY > 30 ):hornet_skill1 = True
+            if self.nowBossY > 32 and self.nowBossY < 32.5:
+                hornet_skill1 = True
+
             move_action = self.better_move(self.nowBossX,self.nowHeroX,hornet_skill1)
-            attack_action = self.better_action(self.nowBossX,self.nowBossY,self.nowHeroX,hornet_skill1)
+            attack_action = self.better_action(float(self.mp),self.nowBossX,self.nowBossY,self.nowHeroX,hornet_skill1)
         take_direction(move_action)
         take_action(attack_action)
 
@@ -69,7 +72,7 @@ class HollowKnightEnv:
 
         self.get_hp_position()
         reward = self.move_judge(self.health,self.nowhealth,self.nowHeroX,self.nowBossX,move_action)
-        attack_reward = self.action_judge(self.boss_health,self.nowBosshealth,self.health,self.nowhealth,self.nowHeroX,self.nowBossX,self.nowBossY,attack_action)
+        attack_reward = self.action_judge(self.boss_health,self.nowBosshealth,self.health,self.nowhealth,self.nowHeroX,self.nowBossX,self.nowBossY,attack_action,hornet_skill1)
         
         self.health = self.nowhealth
         self.boss_health = self.nowBosshealth
@@ -113,27 +116,32 @@ class HollowKnightEnv:
             else:
                 return 1
 
-    def better_action(self, hornet_x, hornet_y, player_x, hornet_skill1):
+    def better_action(self, soul,hornet_x, hornet_y, player_x, hornet_skill1):
         dis = abs(player_x - hornet_x)
         if hornet_skill1:
             if dis < 3:
-                return 4
+                return 6
             else:
-                return 0
-        if dis < 1.5:
+                return 1
+        
+        if hornet_y > 34 and dis < 5 and soul >= 33:
             return 4
+        if dis < 1.5:
+            return 6
         elif dis < 5:
             if hornet_y > 32:
-                return 4
+                return 6
             else:
-                act = np.random.randint(2)
-                if(act > 0) : act = 2 + np.random.randint(2)
+                act = np.random.randint(6)
+                if soul < 33:
+                    while act == 4 or act == 5:
+                        act = np.random.randint(6)
                 return act
         elif dis < 12:
             act = np.random.randint(2)
             return 2 + act
         else:
-            return 4
+            return 6
         
     def move_judge(self,self_blood, next_self_blood, player_x, hornet_x, move):
         hornet_skill1 = False
@@ -219,6 +227,85 @@ class HollowKnightEnv:
                 return 2
             else:
                 return -2
+
+    @staticmethod
+    def act_skill_reward(hornet_skill1, action, next_hornet_x, next_hornet_y, next_player_x):
+        skill_reward = 0
+        if hornet_skill1:
+            if action == 2 or action == 3:
+                skill_reward -= 5
+        elif  next_hornet_y >34 and abs(next_hornet_x - next_player_x) < 5:
+            if action == 4:
+                skill_reward += 2
+        return skill_reward
+    
+    @staticmethod
+    def act_distance_reward(action, next_player_x, next_hornet_x, next_hornet_y):
+        distance_reward = 0
+        if abs(next_player_x - next_hornet_x) < 12:
+            if abs(next_player_x - next_hornet_x) > 4:
+                if (action >= 2 and action <= 3) or action == 0:
+                    # distance_reward += 0.5
+                    pass
+                elif next_hornet_y < 29 and action == 6:
+                    distance_reward -= 3
+            else:
+                if action >= 2 and action <= 3:
+                    distance_reward -= 0.5
+        else:
+            if action == 0 or  action == 1 :
+                distance_reward -= 3
+            elif action == 6:
+                distance_reward += 1
+        return distance_reward
+
+    # JUDGEMENT FUNCTION, write yourself
+    def action_judge(self,boss_blood, next_boss_blood, self_blood, next_self_blood, next_player_x, next_hornet_x,next_hornet_y, action,hornet_skill1):
+    # Player dead
+        distance_reward = self.act_distance_reward(action, next_player_x, next_hornet_x, next_hornet_y)
+        self_blood_reward = self.count_self_reward(next_self_blood, self_blood)
+        boss_blood_reward = self.count_boss_reward(next_boss_blood, boss_blood)
+        skill_reward = self.act_skill_reward(hornet_skill1,action,next_hornet_x,next_hornet_y,next_player_x)
+        attackreward = self_blood_reward + boss_blood_reward + distance_reward  + skill_reward
+        if action == 4:
+            attackreward *= 1.5
+        elif action == 5:
+            attackreward *= 0.5
+        return attackreward
+        
+    def get_hp_position(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect(('127.0.0.1', 5555))
+                try:
+                    data = s.recv(1024)
+                    data = data.decode().replace("\n", '')
+                    parts = data.split("/")  # 先以斜線切開
+                    result = []
+                    for i in range(0, len(parts)-1, 2):
+                        hp = int(parts[i])
+                        coords = parts[i+1].strip("()").split(",")
+                        x = float(coords[0])
+                        y = float(coords[1])
+                        result.append({
+                            "hp": hp,
+                            "x": x,
+                            "y": y
+                        })
+                    result.append({
+                        "mp" : parts[4]
+                    })
+                    self.mp = parts[4] #mp
+                    self.nowBosshealth = result[0]['hp']
+                    self.nowBossX = result[0]['x']
+                    self.nowhealth = result[1]['hp']
+                    self.nowHeroX = result[1]['x'] 
+                    self.nowBossY = result[0]['y']
+                    self.nowHeroY = result[1]['y'] 
+
+                    print(result)
+                    return result
+                except Exception as e:
+                     self.done = True
             
     def check_done(self):
         """
@@ -231,66 +318,6 @@ class HollowKnightEnv:
         if self.step_count >= 1000:
             return True  # 步數上限，遊戲結束
         return False
-    @staticmethod
-    def act_distance_reward(action, next_player_x, next_hornet_x, next_hornet_y):
-        distance_reward = 0
-        if abs(next_player_x - next_hornet_x) < 12:
-            if abs(next_player_x - next_hornet_x) > 4:
-                if (action >= 2 and action <= 3) or action == 0:
-                    # distance_reward += 0.5
-                    pass
-                elif next_hornet_y < 29 and action == 4:
-                    distance_reward -= 3
-            else:
-                if action >= 2 and action <= 3:
-                    distance_reward -= 0.5
-        else:
-            if action == 0 or  action == 1 :
-                distance_reward -= 3
-            elif action == 4:
-                distance_reward += 1
-        return distance_reward
-
-    # JUDGEMENT FUNCTION, write yourself
-    def action_judge(self,boss_blood, next_boss_blood, self_blood, next_self_blood, next_player_x, next_hornet_x,next_hornet_y, action):
-    # Player dead
-        distance_reward = self.act_distance_reward(action, next_player_x, next_hornet_x, next_hornet_y)
-        self_blood_reward = self.count_self_reward(next_self_blood, self_blood)
-        boss_blood_reward = self.count_boss_reward(next_boss_blood, boss_blood)
-
-        attackreward = self_blood_reward + boss_blood_reward + distance_reward 
-        return attackreward
-        
-    def get_hp_position(self):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.connect(('127.0.0.1', 5555))
-                try:
-                    data = s.recv(1024)
-                    data = data.decode().replace("\n", '')
-                    parts = data.split("/")  # 先以斜線切開
-                    result = []
-                    for i in range(0, len(parts), 2):
-                        hp = int(parts[i])
-                        coords = parts[i+1].strip("()").split(",")
-                        x = float(coords[0])
-                        y = float(coords[1])
-                        result.append({
-                            "hp": hp,
-                            "x": x,
-                            "y": y
-                        })
-                    self.nowBosshealth = result[0]['hp']
-                    self.nowBossX = result[0]['x']
-                    self.nowhealth = result[1]['hp']
-                    self.nowHeroX = result[1]['x'] 
-                    self.nowBossY = result[0]['y']
-                    self.nowHeroY = result[1]['y'] 
-       
-                    print(result)
-                    return result
-                except Exception as e:
-                     self.done = True
-
 #         def calculate_reward(self,action):
 #         """
 #         計算獎勵
