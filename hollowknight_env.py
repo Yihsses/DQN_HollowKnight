@@ -5,13 +5,12 @@ from Tool.action import  take_action
 from Tool.action import  take_direction
 from Tool.action import TackAction
 from Tool.screngrap import screngrap
-from ultralytics import YOLO
 from datetime import datetime
 import socket
 import math
 import os
 
-model = YOLO("./YOLO/best.pt")
+
 hold_time = []
 # 載入模型
 class HollowKnightEnv:
@@ -61,12 +60,10 @@ class HollowKnightEnv:
         if(is_random):
             if self.nowBossY > 32 and self.nowBossY < 32.5:
                 hornet_skill1 = True
-
             move_action = self.better_move(self.nowBossX,self.nowHeroX,hornet_skill1)
             attack_action = self.better_action(float(self.mp),self.nowBossX,self.nowBossY,self.nowHeroX,hornet_skill1)
         take_direction(move_action)
         take_action(attack_action)
-
         # action_thread = TackAction(threadID=1, name="ActionThread", direction=None, action=move_action)  # 0 代表 Attack
         # action_thread.start()
 
@@ -80,8 +77,8 @@ class HollowKnightEnv:
         print(f"[REWARD] Total: {reward} | Attack: {attack_reward}")
 
         self.step_count += 1
-
-        return reward,attack_reward, self.done
+        self.done = self.check_done() 
+        return move_action,attack_action,reward,attack_reward, self.done
 
 
     def better_move(self, hornet_x ,player_x, hornet_skill1):
@@ -132,14 +129,18 @@ class HollowKnightEnv:
             if hornet_y > 32:
                 return 6
             else:
-                act = np.random.randint(6)
-                if soul < 33:
-                    while act == 4 or act == 5:
-                        act = np.random.randint(6)
+                act = np.random.randint(2)
+                print(act)
+                if(act == 1) : act = 5
+
+                if soul < 33 :
+                    act = 0
                 return act
         elif dis < 12:
-            act = np.random.randint(2)
-            return 2 + act
+            act = np.random.randint(3)
+            if (act == 1) : act = 2
+            if (act == 2) : act = 3
+            return act
         else:
             return 6
         
@@ -315,8 +316,7 @@ class HollowKnightEnv:
             return True 
         if self.health <= 0:
             return True  # 健康值耗盡，遊戲結束
-        if self.step_count >= 1000:
-            return True  # 步數上限，遊戲結束
+
         return False
 #         def calculate_reward(self,action):
 #         """

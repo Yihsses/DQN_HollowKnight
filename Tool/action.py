@@ -100,16 +100,15 @@ def Skill_Up():
     Nothing()
     time.sleep(0.15)
 # 5
+
 def Skill_Down():
     sendkey.PressKey(S)
     sendkey.PressKey(F)
-    sendkey.PressKey(J)
-    time.sleep(0.2)
+    time.sleep(0.15)
     sendkey.ReleaseKey(S)
     sendkey.ReleaseKey(F)
-    sendkey.ReleaseKey(J)
     Nothing()
-    time.sleep(0.3)
+    time.sleep(0.15)
 # 3
 def Mid_Jump():
     sendkey.PressKey(Space)

@@ -21,41 +21,50 @@ from dqn_net import SimpleQ
 import torch.cuda.amp as amp
 import collections
 from Tool.action import restart
+from MLP import CoordinateNet
+from Tool.CoordinateBuffer import CoordinateClient
+# plt.ion()  # 打開交互模式
+# fig, ax = plt.subplots()
+# reward_line, = ax.plot([], [], label="Reward")
+# ax.set_xlabel("Episodes")
+# ax.set_ylabel("Reward")
+# ax.legend()
+all_rewards = []
 
 move_action_num = 4
 attack_action_num = 7
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
-model =  ResNet3D( height=200, width=400, num_actions=move_action_num,image_channels=1).to(device)
-target_model =  ResNet3D( height=200, width=400, num_actions=move_action_num,image_channels=1).to(device)
+model =  ResNet3D(  num_actions=move_action_num,image_channels=1).to(device)
+target_model =  ResNet3D(  num_actions=move_action_num,image_channels=1).to(device)
 
-act_model =  ResNet3D( height=200, width=400, num_actions=attack_action_num,image_channels=1).to(device)
-act_target_model =  ResNet3D( height=200, width=400, num_actions=attack_action_num,image_channels=1).to(device)
-# model =  Q_construct(input_dim=int((400/4)*(200/4)), num_actions=6,image_channels=12).to(device)
-# target_model =Q_construct(input_dim=int((400/4)*(200/4)), num_actions=6,image_channels=12).to(device)
-# model =  Q_construct_3d(height=400, width=200,time_steps=8, num_actions=1, image_channels=1).to(device)
-# target_model = Q_construct_3d(height=400, width=200, time_steps=8, num_actions=1, image_channels=1).to(device)
+act_model =  ResNet3D( num_actions=attack_action_num,image_channels=1).to(device)
+act_target_model =  ResNet3D(  num_actions=attack_action_num,image_channels=1).to(device)
 
-# model =  Q_construct_3d(height=400, width=200,time_steps=8, num_actions=6, image_channels=1).to(device)
-# target_model  = Q_construct_3d(height=400, width=200, time_steps=8, num_actions=6, image_channels=1).to(device)
+# model = CoordinateNet(move_action_num).to(device)
+# target_model = CoordinateNet(move_action_num).to(device)
+
+# act_model = CoordinateNet(attack_action_num).to(device)
+# act_target_model = CoordinateNet(attack_action_num).to(device)
+
 
 update_count = 0
 attack_update_count =0
-# model.load_state_dict(torch.load(".\save\HollowKnight_16000.pth"))
-# target_model.load_state_dict(torch.load(".\save\HollowKnight_16000.pth"))
-# act_model.load_state_dict(torch.load(".\save\HollowKnight_act_16000.pth"))
-# act_target_model.load_state_dict(torch.load(".\save\HollowKnight_act_16000.pth"))
+model.load_state_dict(torch.load(".\save\HollowKnight_100000.pth"))
+target_model.load_state_dict(torch.load(".\save\HollowKnight_100000.pth"))
+act_model.load_state_dict(torch.load(".\save\HollowKnight_act_100000.pth"))
+act_target_model.load_state_dict(torch.load(".\save\HollowKnight_act_100000.pth"))
 
-epsilon =0.98
+epsilon =0
 epsilon_min = 0   # 最小探索機率
-epsilon_decay = 0.95
+epsilon_decay = 0.98
 gridsize = 15
 GAMMA = 0.995
 TARGET_UPDATE_FREQUENCY = 4000 
-NETWORK_UPDATE_FREQUENCY = 2
+NETWORK_UPDATE_FREQUENCY = 1
 MODEL_SAVE_FREQUENCY = 4000
-DELAY_REWARD = 1
+DELAY_REWARD = 2
 optimizer = torch.optim.NAdam(model.parameters(), lr = 0.0001)
 attack_optimizer  = torch.optim.NAdam(act_model.parameters(), lr = 0.0001)
 attack_memory = ReplayMemory(600)
@@ -69,18 +78,20 @@ def run_episode(num_games):
     time.sleep(10)
     frame_buffer = framebuffer.FrameBuffer(windows_name="HOLLOW KNIGHT", buffer_size=4, capture_interval=0.01)
     frame_buffer.start()
+    cb = CoordinateClient()
     restart()
 
     DelayReward = collections.deque(maxlen=DELAY_REWARD)
     DelayStation = collections.deque(maxlen=DELAY_REWARD + 1) # 1 more for next_station
     DelayActions = collections.deque(maxlen=DELAY_REWARD)
     DelayDirection = collections.deque(maxlen=DELAY_REWARD)
+    DelayCoords  = collections.deque(maxlen=DELAY_REWARD)
 
     attack_DelayReward = collections.deque(maxlen=DELAY_REWARD)
     attack_DelayStation = collections.deque(maxlen=DELAY_REWARD + 1) # 1 more for next_station
     attack_DelayActions = collections.deque(maxlen=DELAY_REWARD)
     attack_DelayDirection = collections.deque(maxlen=DELAY_REWARD)
-
+    attack_DelayCoords  = collections.deque(maxlen=DELAY_REWARD)
     env.reset()  # 假設 `HollowKnightEnv` 提供 reset 方法
     
 
@@ -91,46 +102,63 @@ def run_episode(num_games):
     episode_games = 0
     while run:
         frames = frame_buffer.get_latest_3d_frames()
-
+        latest = cb.get_coordinates()
+        if len(latest) != 0 :        
+            boss_x = (latest[0]["x"] - 15.3) / 22.3
+            boss_y = (latest[0]["y"] - 28.4) / 9.2
+            hero_x = (latest[1]["x"] - 15.3) / 22.3
+            hero_y = (latest[1]["y"] - 28.4) / 9.2
+        else:
+            Nothing()
+            all_rewards.append(total_reward)
+            run = False
+            frame_buffer.running=False
+            return total_reward
+        if latest:
+            print("最新座標:", latest)
         rand = np.random.uniform(0, 1) 
         action = 0
         attack_action = 0
         is_random = False
+        coords = torch.tensor([[boss_x, boss_y, hero_x, hero_y]], dtype=torch.float32).to(device)
         global epsilon 
         if(frames == None):
             continue 
         if rand > epsilon and frames != None:
             if(frames.shape[2] == 4):
                 with torch.no_grad():
-                    action = torch.argmax(model(frames.to(device)), dim=1).item()
-                    attack_action = torch.argmax(act_model(frames.to(device)), dim=1).item()
-                    is_random = True
+                    # action = torch.argmax(torch.tensor([[boss_x, boss_y, hero_x, hero_y]], dtype=torch.float32),dim=1).item()  
+                    # attack_action = torch.argmax(torch.tensor([[boss_x, boss_y, hero_x, hero_y]], dtype=torch.float32),dim=1).item()  
+
+                    action = torch.argmax(model(frames.to(device),coords), dim=1).item()
+                    attack_action = torch.argmax(act_model(frames.to(device),coords), dim=1).item()
+                    is_random = False
                 print ("模型" + str(action))
         else:
-            attack_action = np.random.randint(0,attack_action_num) 
-            action = np.random.randint(0,move_action_num) 
             is_random = True
-            print("隨機：" + str(attack_action) + " " +  str(action))
 
-        reward,attack_reward,done = env.step(action,attack_action,is_random)
+
+        action,attack_action,reward,attack_reward,done = env.step(action,attack_action,is_random)
+        print("隨機：" + str(action) + " " +  str(attack_action))
 
         DelayReward.append(reward)
         DelayStation.append(frames)
         DelayActions.append(action)
         DelayDirection.append(move)
+        DelayCoords.append(coords)
 
         attack_DelayReward.append(attack_reward)
         attack_DelayStation.append(frames)
         attack_DelayActions.append(attack_action)
         attack_DelayDirection.append(move)
-
+        attack_DelayCoords.append(coords)
         if len(DelayStation) >= DELAY_REWARD + 1:
             if DelayReward[0] != 0:
-                memory.push(DelayStation[0], DelayActions[0], DelayReward[0], DelayStation[1] , done)
+                memory.push(DelayStation[0], DelayActions[0], DelayReward[0], DelayStation[1],DelayCoords[0], DelayCoords[1], done)
 
         if len(attack_DelayStation) >= DELAY_REWARD + 1:
             if attack_DelayReward[0] != 0:
-                attack_memory.push(attack_DelayStation[0], attack_DelayActions[0], attack_DelayReward[0], attack_DelayStation[1] , done)
+                attack_memory.push(attack_DelayStation[0], attack_DelayActions[0], attack_DelayReward[0], attack_DelayStation[1],attack_DelayCoords[0],attack_DelayCoords[1] , done)
                       
         memory.truncate()
         attack_memory.truncate()
@@ -142,6 +170,8 @@ def run_episode(num_games):
         if done == True:
             Nothing()
             run = False 
+            all_rewards.append(total_reward)
+            total_reward = 0 
             # len_array.append(len_of_snake)
             # board.resetgame()aa
             if num_games == games_played:
@@ -155,9 +185,6 @@ def run_episode(num_games):
 
 MSE = nn.MSELoss()
 
-import torch.amp as amp  # 使用 torch.amp 而非 torch.cuda.amp
-
-import psutil
 import torch.amp as amp  # 使用 torch.amp 而非 torch.cuda.amp
 import psutil
 
@@ -230,16 +257,18 @@ def learn(num_updates, batch_size, target_model, TARGET_UPDATE_FREQUENCY):
 
         optimizer.zero_grad()
         sample = memory.sample(batch_size)
-        states, actions, rewards, next_states, dones = sample
+        states, actions, rewards, next_states, coords,next_coords,dones = sample
+
         states = torch.cat([x for x in states], dim=0).to(device)
         actions = torch.LongTensor(actions).to(device)
         rewards = torch.FloatTensor(rewards).to(device)
         next_states = torch.cat([x for x in next_states], dim=0).to(device)
         dones = torch.FloatTensor(dones).to(device)
-
-        q_local = model.forward(states)
+        coords = torch.cat([c.detach().clone().unsqueeze(0) if isinstance(c, torch.Tensor) else torch.tensor(c, dtype=torch.float32).unsqueeze(0) for c in coords], dim=0).to(device)
+        next_coords = torch.cat([c.detach().clone().unsqueeze(0) if isinstance(c, torch.Tensor) else torch.tensor(c, dtype=torch.float32).unsqueeze(0) for c in next_coords], dim=0).to(device)
+        q_local = model.forward(states,coords)
         with torch.no_grad():
-            next_q_value = target_model.forward(next_states)
+            next_q_value = target_model.forward(next_states,next_coords)
 
         Q_expected = q_local.gather(1, actions.unsqueeze(0).transpose(0, 1)).transpose(0, 1).squeeze(0)
 
@@ -270,19 +299,21 @@ def attack_learn(num_updates, batch_size, target_model, TARGET_UPDATE_FREQUENCY)
     act_target_model.eval()
     for i in range(num_updates):
         attack_optimizer.zero_grad()
-        sample = memory.sample(batch_size)
-        states, actions, rewards, next_states, dones = sample
+        sample = attack_memory.sample(batch_size)
+        states, actions, rewards, next_states, coords,next_coords,dones = sample
         states = torch.cat([x for x in states], dim=0).to(device)
         actions = torch.LongTensor(actions).to(device)
         rewards = torch.FloatTensor(rewards).to(device)
         next_states = torch.cat([x for x in next_states], dim=0).to(device)
         dones = torch.FloatTensor(dones).to(device)
-        q_local = model.forward(states)
+        coords = torch.cat([c.detach().clone().unsqueeze(0) if isinstance(c, torch.Tensor) else torch.tensor(c, dtype=torch.float32).unsqueeze(0) for c in coords], dim=0).to(device)
+        next_coords = torch.cat([c.detach().clone().unsqueeze(0) if isinstance(c, torch.Tensor) else torch.tensor(c, dtype=torch.float32).unsqueeze(0) for c in next_coords], dim=0).to(device)
+
+        q_local = act_model.forward(states,coords)
         with torch.no_grad():
-            next_q_value = target_model.forward(next_states)
+            next_q_value = act_target_model.forward(next_states,next_coords)
 
         Q_expected = q_local.gather(1, actions.unsqueeze(0).transpose(0, 1)).transpose(0, 1).squeeze(0)
-
         Q_targets_next = torch.max(next_q_value, dim=1)[0] * (torch.ones_like(dones) - dones)
 
         Q_targets = rewards + GAMMA * Q_targets_next
@@ -307,9 +338,18 @@ def attack_learn(num_updates, batch_size, target_model, TARGET_UPDATE_FREQUENCY)
 num_episodes = 60000
 num_updates =200
 print_every = 10
-games_in_episode = 30
-batch_size =16
+games_in_episode =10
+batch_size = 16
+reward_file = "all_rewards.csv"
 
+def save_rewards(all_rewards, filename=reward_file):
+    with open(filename, "w") as f:
+        f.write(",".join([str(r) for r in all_rewards]))
+    # reward_line.set_data(range(len(all_rewards)), all_rewards)
+    # ax.relim()           # 重新計算所有數據的範圍
+    # ax.autoscale_view()  # 自動縮放 x, y 軸
+    # plt.pause(0.01)
+    
 def train():
     scores_array = []  
     avg_scores_array = []  
@@ -319,11 +359,17 @@ def train():
             print(f"{name}: Grad Max = {param.grad.abs().max()}, Weight Max = {param.data.abs().max()}")
     for i_episode in range(1, num_episodes + 1):
         time.sleep(7)
-        run_episode(games_in_episode)  # 運行一個回合
+        run_episode(games_in_episode) 
+        save_rewards(all_rewards)
+
+        # 每次更新 all_rewards 時，寫入檔案
+
         if(i_episode % NETWORK_UPDATE_FREQUENCY ==0):
-            total_loss = learn(num_updates, batch_size,target_model,TARGET_UPDATE_FREQUENCY)
-            time.sleep(1)
             total_loss_attack = attack_learn(num_updates, batch_size,act_target_model,TARGET_UPDATE_FREQUENCY)
+
+            time.sleep(1)
+            total_loss = learn(num_updates, batch_size,target_model,TARGET_UPDATE_FREQUENCY)
+
             print(total_loss)
             print(total_loss_attack)
             global epsilon

@@ -1,23 +1,14 @@
 import socket
 import threading
+from Tool.CoordinateBuffer import CoordinateClient
+import time
+# 'hp': 8, 'x': 15.3, 'y': 28.4 左邊
+# 'hp': 3, 'x': 37.6, 'y': 37.9} 右上
 print( 4 // 5)
-with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect(('127.0.0.1', 5555))
-            data = s.recv(1024)
-            data = data.decode().replace("\n", '')
-            parts = data.split("/")  # 先以斜線切開
-            result = []
-            for i in range(0, len(parts), 2):
-                hp = int(parts[i])
-                coords = parts[i+1].strip("()").split(",")
-                x = float(coords[0])
-                y = float(coords[1])
-                result.append({
-                    "hp": hp,
-                    "x": x,
-                    "y": y
-                })
-            result.append({
-                "mp" : parts[4]
-            })
-            print(result)
+while True:
+    try:
+        cb = CoordinateClient()
+        print(cb.get_coordinates())
+        time.sleep(1)
+    except:
+        print()
