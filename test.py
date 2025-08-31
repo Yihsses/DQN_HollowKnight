@@ -1,48 +1,61 @@
-from torchviz import make_dot
-from Q_3d_resnet import ResNet3D
-import torch
-import torch.nn as nn
-import numpy as np
-model = ResNet3D(num_actions=6)
-dummy_input = torch.randn(1, 1, 4, 160, 160)  # (B, C, T, H, W)
-output = model(dummy_input)
-make_dot(output, params=dict(model.named_parameters())).render("resnet3d", format="png")
-
-
 
 from dqn_3cnn import Q_construct_3d
 from Tool import framebuffer
 from Tool import screngrap
-state = screngrap.screngrap.grap('HOLLOW KNIGHT')
+from Tool.CoordinateBuffer import CoordinateClient
+import time
+from torchvision import models, transforms
+import torch.nn as nn
+import torch
+import torch.nn.functional as F
+class_names = ["down", "nomove", "nothing", "rusg", "shot", "skill"]
 
-# 檢查 GPU
+# 建立模型結構
+num_classes = len(class_names)
+model = models.resnet18(pretrained=False)  # 這裡不用 pretrained
+model.fc = nn.Linear(model.fc.in_features, num_classes)
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Using device: {device}")
+model.load_state_dict(torch.load("YOLO/resnet18_best.pth", map_location=device))
+model.to(device)
+model.eval()
+model.eval()  # 切換成推理模式
+# 載入訓練好的權重
 
-# 初始化 FrameBuffer 和模型
-frame_buffer = framebuffer.FrameBuffer(windows_name="HOLLOW KNIGHT", buffer_size=4, capture_interval=0.05)
-model = Q_construct_3d(height=1280 // 4, width=720 // 4, num_actions=7, image_channels=4).to(device)
-frame_buffer.start()
+cb =   CoordinateClient()
+dx = 45.0892857143
+dy = (525-25)/(39-28.6)
+# 40 - 28.6
+number = 1000
+pred_class = "nothing"
 
 while True:
-    frames = frame_buffer.get_latest_frames()
+    try:
+        number += 1 
+        temp = cb.get_coordinates()
+        x = (temp[0]['x']-15.3) * dx +50
+        y = 525-(temp[0]['y']-28.6) * dy  
 
-    if frames is not None:
-        if len(frames) >= 4:
-            # 調整維度並移動到 GPU
-            frames = frames.permute(1, 0, 2, 3).unsqueeze(0).to(device)
-            
-            # 使用模型進行推論
-            with torch.no_grad():  # 關閉梯度計算以加速推論
-                action_0 = model(frames)
-                print(action_0)
+        output  = model(screngrap.screngrap.grap(
+            'HOLLOW KNIGHT', d_height=180, d_width=200, d_top=y, d_left=x, img2_return=True
+        ).to(device))
 
-# 抓取單幀並移動到 GPU
-state = torch.tensor(state).permute(2, 0, 1)
-state = torch.tensor(state, dtype=torch.float32) / 255.0
-state = state.unsqueeze(0).to(device)
+        # 轉成機率
+        probs = F.softmax(output, dim=1)
+        max_prob, pred_idx = torch.max(probs, 1)    # 找最大值和索引
 
-# 推論動作
-with torch.no_grad():
-    action_0 = model(state)
-rand = np.random.uniform(0, 1)
+        # 取得其他類別機率
+        other_probs = probs[0, [i for i in range(len(class_names)) if i != pred_idx.item()]]
+
+        # 條件判斷
+        if max_prob.item() > 0.8 and torch.all(other_probs < 0.3):
+            pred_class = class_names[pred_idx.item()]
+            prev_class = pred_class
+        else:
+            pred_class = prev_class  # 維持上一個動作
+
+        print(pred_class)
+        time.sleep(0.1)
+
+    except Exception as e:
+        print("Error:", e)

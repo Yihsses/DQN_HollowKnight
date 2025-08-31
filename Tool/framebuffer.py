@@ -19,7 +19,7 @@ class FrameBuffer(threading.Thread):
         # state = torch.tensor(frame, dtype=torch.float32) / 255.0 # 歸一化
         # state = state.unsqueeze(0)  # 添加批次維度
 
-        state = torch.tensor(frame, dtype=torch.float32)  / 255.0  # 歸一化
+        state = torch.tensor(frame, dtype=torch.float32)   # 歸一化
         state = state.unsqueeze(0)  # 添加批次維度
         state = state.unsqueeze(0) 
         # return state

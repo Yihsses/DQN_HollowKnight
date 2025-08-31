@@ -33,6 +33,7 @@ class HollowKnightEnv:
         self.attack_fail = 0 
         self.boss_left = 0 
         self.hero_left = 0
+        self.pred_stats = ""
     def reset(self):
         """
         重置環境到初始狀態
@@ -44,7 +45,6 @@ class HollowKnightEnv:
         self.nowBossX = 0
         self.nowHeroY = 0
         self.nowBossY = 0
-
         self.attack_fail = 0
         self.first_attacked = False 
         self.done = False
@@ -54,14 +54,16 @@ class HollowKnightEnv:
         self.step_count = 0
         self.boss_left = 0 
         self.hero_left = 0
+        self.pred_stats = ""
         return self.state
-    def step(self, move_action,attack_action,is_random):
+    def step(self, move_action,attack_action,is_random,boss_stats):
         hornet_skill1 = False
+        if self.nowBossY > 32 and self.nowBossY < 32.5:
+            hornet_skill1 = True
         if(is_random):
-            if self.nowBossY > 32 and self.nowBossY < 32.5:
-                hornet_skill1 = True
             move_action = self.better_move(self.nowBossX,self.nowHeroX,hornet_skill1)
             attack_action = self.better_action(float(self.mp),self.nowBossX,self.nowBossY,self.nowHeroX,hornet_skill1)
+        self.pred_stats = boss_stats
         take_direction(move_action)
         take_action(attack_action)
         # action_thread = TackAction(threadID=1, name="ActionThread", direction=None, action=move_action)  # 0 代表 Attack
@@ -129,18 +131,14 @@ class HollowKnightEnv:
             if hornet_y > 32:
                 return 6
             else:
-                act = np.random.randint(2)
-                print(act)
-                if(act == 1) : act = 5
-
-                if soul < 33 :
-                    act = 0
+                act = np.random.randint(6)
+                if soul < 33:
+                    while act == 4 or act == 5:
+                        act = np.random.randint(6)
                 return act
         elif dis < 12:
-            act = np.random.randint(3)
-            if (act == 1) : act = 2
-            if (act == 2) : act = 3
-            return act
+            act = np.random.randint(2)
+            return 2 + act
         else:
             return 6
         
@@ -241,11 +239,11 @@ class HollowKnightEnv:
         return skill_reward
     
     @staticmethod
-    def act_distance_reward(action, next_player_x, next_hornet_x, next_hornet_y):
+    def act_distance_reward(action, pred_stats,next_player_x, next_hornet_x, next_hornet_y):
         distance_reward = 0
         if abs(next_player_x - next_hornet_x) < 12:
             if abs(next_player_x - next_hornet_x) > 4:
-                if (action >= 2 and action <= 3) or action == 0:
+                if (action >= 2 and action <= 3):
                     # distance_reward += 0.5
                     pass
                 elif next_hornet_y < 29 and action == 6:
@@ -263,15 +261,24 @@ class HollowKnightEnv:
     # JUDGEMENT FUNCTION, write yourself
     def action_judge(self,boss_blood, next_boss_blood, self_blood, next_self_blood, next_player_x, next_hornet_x,next_hornet_y, action,hornet_skill1):
     # Player dead
-        distance_reward = self.act_distance_reward(action, next_player_x, next_hornet_x, next_hornet_y)
+        distance_reward = self.act_distance_reward(action,self.pred_stats ,next_player_x, next_hornet_x, next_hornet_y)
         self_blood_reward = self.count_self_reward(next_self_blood, self_blood)
         boss_blood_reward = self.count_boss_reward(next_boss_blood, boss_blood)
         skill_reward = self.act_skill_reward(hornet_skill1,action,next_hornet_x,next_hornet_y,next_player_x)
+        if(self.pred_stats == "rush" or self.pred_stats == "shot" ):
+            if(action >= 2 and action <= 3):
+                return  5
+            else:
+                return -5
         attackreward = self_blood_reward + boss_blood_reward + distance_reward  + skill_reward
-        if action == 4:
+        if action == 4 and int(self.mp) >= 33:
             attackreward *= 1.5
-        elif action == 5:
-            attackreward *= 0.5
+        elif action == 4 and int(self.mp) < 33 :
+            attackreward -= 1
+        if action == 5 and int(self.mp) >= 33:
+            attackreward *= 1.5
+        elif action == 5 and int(self.mp) < 33:
+            attackreward -= 1
         return attackreward
         
     def get_hp_position(self):
