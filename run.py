@@ -15,17 +15,20 @@ from hollowknight_env import HollowKnightEnv
 from MLP import CombinedNet
 from ResNetEmp import ResNetEmbedding
 import torchvision 
+import csv
+
 # ------------------ 全域參數 ------------------
 import matplotlib.pyplot as plt
 
-plt.ion()
-fig, ax = plt.subplots()
-line, = ax.plot([], [], label="Reward")
-ax.set_xlabel("Episodes (x10)")
-ax.set_ylabel("Average")
-ax.legend()
+# plt.ion()
+# fig, ax = plt.subplots()
+# line, = ax.plot([], [], label="Reward")
+# ax.set_xlabel("Episodes (x10)")
+# ax.set_ylabel("Average")
+# ax.legend()
 
-
+TOTALWIN = 0
+TOTALGAME = 0
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
@@ -35,7 +38,7 @@ cb =   CoordinateClient()
 dx = 45.0892857143
 dy = (525-25)/(39-28.6)
 
-epsilon = 0.1
+epsilon = 0
 epsilon_min = 0
 epsilon_decay = 0.98
 GAMMA = 0.995
@@ -43,7 +46,7 @@ TARGET_UPDATE_FREQUENCY = 4000
 NETWORK_UPDATE_FREQUENCY = 1
 MODEL_SAVE_FREQUENCY = 4000
 DELAY_REWARD = 2
-
+ISTRAIN = False
 avg_rewards = []
 
 # ------------------ 初始化模型 ------------------
@@ -55,10 +58,10 @@ target_model = CombinedNet(move_action_num, input_dim=state_dim).to(device)
 act_model = CombinedNet(attack_action_num, input_dim=state_dim).to(device)
 act_target_model = CombinedNet(attack_action_num, input_dim=state_dim).to(device)
 
-model.load_state_dict(torch.load(".\\save\\HollowKnightMove_100000_v1.pth", map_location=device))
-target_model.load_state_dict(torch.load(".\\save\\HollowKnightMove_100000_v1.pth", map_location=device))
-act_model.load_state_dict(torch.load(".\\save\\HollowKnightAttack_100000_v1.pth", map_location=device))
-act_target_model.load_state_dict(torch.load(".\\save\\HollowKnightAttack_100000_v1.pth", map_location=device))
+model.load_state_dict(torch.load(".\\save\\HollowKnightMove_116000_v6.pth", map_location=device))
+target_model.load_state_dict(torch.load(".\\save\\HollowKnightMove_116000_v6.pth", map_location=device))
+act_model.load_state_dict(torch.load(".\\save\\HollowKnightAttack_116000_v6.pth", map_location=device))
+act_target_model.load_state_dict(torch.load(".\\save\\HollowKnightAttack_116000_v6.pth", map_location=device))
 
 optimizer = optim.NAdam(model.parameters(), lr=0.0001)
 attack_optimizer = optim.NAdam(act_model.parameters(), lr=0.0001)
@@ -84,17 +87,17 @@ resnet_embed.to(device)
 resnet_embed.eval()
 episode_rewards = []
 
-def update_plot(avg_reward):
-    avg_rewards.append(avg_reward)
-    line.set_xdata(range(len(avg_rewards)))
-    line.set_ydata(avg_rewards)
-    ax.relim()
-    ax.autoscale_view()
-    plt.pause(0.01)
+# def update_plot(avg_reward):
+#     avg_rewards.append(avg_reward)
+#     line.set_xdata(range(len(avg_rewards)))
+#     line.set_ydata(avg_rewards)
+#     ax.relim()
+#     ax.autoscale_view()
+#     plt.pause(0.01)
 
 # ------------------ 遊戲回合 ------------------
 def run_episode(num_games):
-    global epsilon
+    global epsilon,TOTALWIN,TOTALGAME
     model.eval()
     act_model.eval()
     cb = CoordinateClient()
@@ -124,6 +127,7 @@ def run_episode(num_games):
         if len(latest) == 0:
             Nothing()
             run = False
+            TOTALWIN += 1
             return total_reward
         
         x = (latest[0]['x']-15.3) * dx +50
@@ -168,7 +172,7 @@ def run_episode(num_games):
             is_random = True
 
         # 執行動作
-        action, attack_action, reward, attack_reward, done = env.step(action, attack_action, is_random,pred_class)
+        action, attack_action, reward, attack_reward, done,TOTALWIN = env.step(action, attack_action, is_random,pred_class,TOTALWIN)
         print("攻擊動作",attack_action)
         # 更新 Delay buffer
         DelayReward.append(reward)
@@ -243,38 +247,53 @@ def learn(num_updates, batch_size, target_model, is_attack=False):
             attack_update_count += 1
             if attack_update_count % TARGET_UPDATE_FREQUENCY == 0:
                 act_target_model.load_state_dict(act_model.state_dict())
-                torch.save(act_model.state_dict(), f'./save/HollowKnightAttack_{attack_update_count}_v3.pth')
+                torch.save(act_model.state_dict(), f'./save/HollowKnightAttack_{attack_update_count}_v6.pth')
             print("更新網路:", attack_update_count)
 
         else:
             update_count += 1
             if update_count % TARGET_UPDATE_FREQUENCY == 0:
                 target_model.load_state_dict(model.state_dict())
-                torch.save(model.state_dict(), f'./save/HollowKnightMove_{update_count}_v3.pth')
+                torch.save(model.state_dict(), f'./save/HollowKnightMove_{update_count}_v6.pth')
             print("更新網路:", update_count)
 
     return total_loss
 
+def writeCSV():
+    filename = "HollowKnight_results.csv"
+    with open(filename, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        # 寫入欄位名稱
+        writer.writerow(["Total Games", "Total Wins", "Win Rate"])
+        # 寫入數據
+        win_rate = TOTALWIN / TOTALGAME if TOTALGAME > 0 else 0
+        writer.writerow([TOTALGAME, TOTALWIN, win_rate])
 
 # ------------------ 訓練 ------------------ 
 def train(num_episodes=60000, num_updates=400, batch_size=32, games_in_episode=10):
-    global epsilon
+    global epsilon,TOTALWIN,TOTALGAME
     for i_episode in range(1, num_episodes + 1):
         time.sleep(7)
         reward = run_episode(games_in_episode)
         episode_rewards.append(reward)
         print("獎勵:",reward)
-        if i_episode % 10 == 0:
-            avg_reward = sum(episode_rewards[-5:]) / 5
-            update_plot(avg_reward)
-            print(f"Episode {i_episode}, Average Reward (last 10): {avg_reward}")
-        # 更新網路
-        if i_episode % NETWORK_UPDATE_FREQUENCY == 0:
-            attack_loss = learn(num_updates, batch_size, act_target_model, is_attack=True)
-            time.sleep(1)
-            move_loss = learn(num_updates, batch_size, target_model)
-            epsilon = max(epsilon_min, epsilon * epsilon_decay)
-
+        if ISTRAIN :
+            if i_episode % 10 == 0:
+                avg_reward = sum(episode_rewards[-5:]) / 5
+                # update_plot(avg_reward)
+                print(f"Episode {i_episode}, Average Reward (last 10): {avg_reward}")
+            # 更新網路
+            if i_episode % NETWORK_UPDATE_FREQUENCY == 0:
+                attack_loss = learn(num_updates, batch_size, act_target_model, is_attack=True)
+                time.sleep(1)
+                move_loss = learn(num_updates, batch_size, target_model)
+                epsilon = max(epsilon_min, epsilon * epsilon_decay)
+        else:
+            time.sleep(5)
+        TOTALGAME += 1
+        print("總場數：",TOTALGAME)
+        print("總勝利數：",TOTALWIN)
+        writeCSV()
     return 1
 
 # ------------------ 執行 ------------------

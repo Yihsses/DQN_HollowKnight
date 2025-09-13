@@ -56,7 +56,7 @@ class HollowKnightEnv:
         self.hero_left = 0
         self.pred_stats = ""
         return self.state
-    def step(self, move_action,attack_action,is_random,boss_stats):
+    def step(self, move_action,attack_action,is_random,boss_stats,TOTALWIN):
         hornet_skill1 = False
         if self.nowBossY > 32 and self.nowBossY < 32.5:
             hornet_skill1 = True
@@ -79,8 +79,8 @@ class HollowKnightEnv:
         print(f"[REWARD] Total: {reward} | Attack: {attack_reward}")
 
         self.step_count += 1
-        self.done = self.check_done() 
-        return move_action,attack_action,reward,attack_reward, self.done
+        self.done,TOTALWIN = self.check_done(TOTALWIN) 
+        return move_action,attack_action,reward,attack_reward, self.done,TOTALWIN
 
 
     def better_move(self, hornet_x ,player_x, hornet_skill1):
@@ -266,10 +266,15 @@ class HollowKnightEnv:
         boss_blood_reward = self.count_boss_reward(next_boss_blood, boss_blood)
         skill_reward = self.act_skill_reward(hornet_skill1,action,next_hornet_x,next_hornet_y,next_player_x)
         if(self.pred_stats == "rush" or self.pred_stats == "shot" ):
-            if(action >= 2 and action <= 3):
+            if(action >= 2 and action <= 3 or (action == 5 and int(self.mp) >= 33)):
                 return  5
             else:
                 return -5
+        if(self.pred_stats == "nomove"  or self.pred_stats == "nothing"):
+            if(action == 0):
+                return 5 
+            else:
+                return -5 
         attackreward = self_blood_reward + boss_blood_reward + distance_reward  + skill_reward
         if action == 4 and int(self.mp) >= 33:
             attackreward *= 1.5
@@ -315,16 +320,17 @@ class HollowKnightEnv:
                 except Exception as e:
                      self.done = True
             
-    def check_done(self):
+    def check_done(self,TOTALWIN):
         """
         判斷遊戲是否結束
         """
         if self.boss_health <= 0 :
-            return True 
+            TOTALWIN += 1 
+            return True ,TOTALWIN
         if self.health <= 0:
-            return True  # 健康值耗盡，遊戲結束
+            return True ,TOTALWIN # 健康值耗盡，遊戲結束
 
-        return False
+        return False,TOTALWIN
 #         def calculate_reward(self,action):
 #         """
 #         計算獎勵
